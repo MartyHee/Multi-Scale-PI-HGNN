@@ -1,0 +1,58 @@
+# ============================================================
+# Baseline Graph Dataset Configuration
+# ============================================================
+# This config is shared by build_graph_dataset.py, graph_dataset.py,
+# and the future unified training entry.
+# All paths are resolved at runtime via pathlib.
+# ============================================================
+
+# --- Paths ---
+# Project root is resolved at runtime; keep null here.
+project_root: null
+# Absolute path to raw data directory (outside model project)
+raw_data_dir: "D:/※CREC/BiShe/S1/raw_data/GraphTrainingData/"
+# Relative path from project root for processed data
+processed_data_dir: "processed/graph_dataset_baseline"
+# Subdirectory for individual .pt graph files
+graph_subdir: "graphs"
+# Subdirectory for split JSON files
+split_dir: "splits"
+
+# --- Split configuration ---
+split_mode: "by_sample"       # default split mode; options: by_sample, by_loadcase
+train_ratio: 0.8
+val_ratio: 0.1
+test_ratio: 0.1
+random_seed: 42
+
+# --- Feature field definitions ---
+# Node features: 3 coordinate fields + 6 load fields
+coordinate_fields: [X, Y, Z]
+load_fields: [Fx, Fy, Fz, Mx, My, Mz]
+node_feature_fields: [X, Y, Z, Fx, Fy, Fz, Mx, My, Mz]
+
+# Edge features: 4 section property fields
+edge_feature_fields: [Area, Ix, Iy, Iz]
+
+# Target fields: 12 force components (I-end + J-end)
+target_fields:
+  [Fx_I, Fy_I, Fz_I, Mx_I, My_I, Mz_I,
+   Fx_J, Fy_J, Fz_J, Mx_J, My_J, Mz_J]
+
+# --- Save format ---
+save_format: "pt"
+
+# --- Expected dimensions (for validation) ---
+expected_num_nodes: 1056
+expected_num_edges: 1646
+node_feature_dim: 9
+edge_feature_dim: 4
+target_dim: 12
+
+# --- Data files (relative to each sample directory) ---
+files:
+  nodes: "nodes.csv"
+  beam_elements: "beam_elements.csv"
+  beam_sections: "beam_sections.csv"
+  nodal_loads: "nodal_loads.csv"
+  beam_element_results: "beam_element_results.csv"
