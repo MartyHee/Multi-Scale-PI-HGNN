@@ -47,6 +47,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from src.data.graph_dataset import GraphDataset
 from src.data.transforms import NodeEdgeStandardScaler
 from src.models.mlp_edge_regressor import MLPEdgeRegressor
+from src.models.gcn_edge_regressor import GCNEdgeRegressor
 from src.trainers.trainer import Trainer
 from src.utils.experiment import (
     create_experiment_dir,
@@ -121,10 +122,22 @@ def _build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torc
             activation=model_cfg.get("activation", "relu"),
             use_batch_norm=model_cfg.get("use_batch_norm", True),
         )
+    elif model_name == "gcn":
+        model = GCNEdgeRegressor(
+            node_in_dim=model_cfg.get("node_in_dim", 9),
+            edge_attr_dim=model_cfg.get("edge_attr_dim", 4),
+            node_hidden_dim=model_cfg.get("node_hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 3),
+            dropout=model_cfg.get("dropout", 0.2),
+            activation=model_cfg.get("activation", "relu"),
+            use_batch_norm=model_cfg.get("use_batch_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [128, 64]),
+            output_dim=model_cfg.get("output_dim", 12),
+        )
     else:
         raise ValueError(
             f"Unknown model_name '{model_name}'. "
-            f"Available: ['mlp']"
+            f"Available: ['mlp', 'gcn']"
         )
     return model.to(device)
 

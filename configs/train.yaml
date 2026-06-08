@@ -14,7 +14,7 @@ split_mode: "by_sample"               # by_sample | by_loadcase
 batch_size: 64
 
 # --- Model selection (key into models.yaml) ---
-model_name: "mlp"
+model_name: "mlp"  # or "gcn"
 
 # --- Optimization ---
 epochs: 100
@@ -26,7 +26,7 @@ scheduler_patience: 10
 scheduler_factor: 0.5
 
 # --- Loss ---
-loss: "mse"                           # mse, l1 (smooth_l1 available)
+loss: "mse"                           # mse, smooth_l1, l1
 
 # --- Early stopping ---
 early_stopping: true

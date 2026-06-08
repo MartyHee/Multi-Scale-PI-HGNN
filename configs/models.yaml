@@ -14,3 +14,15 @@ mlp:
   # input/output dims resolved at runtime
   input_dim: 22                       # 9 (x_i) + 9 (x_j) + 4 (edge_attr)
   output_dim: 12                      # 12-dim edge targets
+
+gcn:
+  description: "GCN baseline — GCNConv node encoder + edge decoder MLP"
+  node_in_dim: 9                      # node feature dimension
+  edge_attr_dim: 4                    # edge attribute dimension
+  node_hidden_dim: 128                # GCN hidden dimension
+  num_layers: 3                       # number of GCNConv layers
+  dropout: 0.2
+  activation: "relu"                  # relu, gelu, tanh, leaky_relu
+  use_batch_norm: true
+  decoder_hidden_dims: [128, 64]      # decoder MLP hidden layers
+  output_dim: 12                      # 12-dim edge targets
