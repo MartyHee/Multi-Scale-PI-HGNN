@@ -1,0 +1,16 @@
+# ============================================================
+# Model-specific Configurations
+# ============================================================
+# Accessed via model_name from train.yaml
+# input_dim / output_dim are resolved at runtime from dataset.
+# ============================================================
+
+mlp:
+  description: "Per-edge MLP baseline — concatenates x_i + x_j + edge_attr → MLP → 12-dim edge targets"
+  hidden_dims: [256, 128, 64]
+  dropout: 0.1
+  activation: "relu"                  # relu, gelu, tanh, leaky_relu
+  use_batch_norm: true
+  # input/output dims resolved at runtime
+  input_dim: 22                       # 9 (x_i) + 9 (x_j) + 4 (edge_attr)
+  output_dim: 12                      # 12-dim edge targets
