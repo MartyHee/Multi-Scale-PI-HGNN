@@ -1,0 +1,102 @@
+# ============================================================
+# Heterogeneous Graph Dataset Configuration v2
+# ============================================================
+# For Multi-Scale PI-HGNN — based on GraphTrainingData2
+#
+# v2 changes (2026-06-16):
+#   - Removed link_element node type
+#   - Renamed rigid_link → structural_link edge type
+#   - Added edge_attr to reverse edges (rev_belongs_to_beam, rev_belongs_to_plate)
+#   - rigid_elastic_links.csv modeled as mesh_node ↔ mesh_node interaction edge
+#   - structural_link edge_attr includes is_rigid (all RIGID in current data)
+# ============================================================
+
+# --- Paths ---
+# Project root is resolved at runtime; keep null here.
+project_root: null
+# Absolute path to raw data directory (outside model project)
+raw_data_dir: "D:/※CREC/BiShe/S1/raw_data/GraphTrainingData2/"
+# Relative path from project root for processed data
+processed_data_dir: "processed/hetero_graph_dataset_v2"
+# Subdirectory for individual .pt graph files
+graph_subdir: "graphs"
+# Subdirectory for split JSON files
+split_dir: "splits"
+
+# --- Split configuration ---
+default_split_mode: "by_sample"    # by_sample | by_loadcase
+train_ratio: 0.8
+val_ratio: 0.1
+test_ratio: 0.1
+random_seed: 42
+
+# --- Graph topology (static across all samples) ---
+topology:
+  mesh_node: 1056
+  beam_element: 1646
+  plate_element: 832
+  # No link_element — rigid_elastic_links.csv modeled as structural_link edge
+
+# --- Node types (3 types only, per proposal) ---
+node_types:
+  - mesh_node
+  - beam_element
+  - plate_element
+
+# --- Edge types: (source, relation, target) ---
+edge_types:
+  - [mesh_node, belongs_to_beam, beam_element]
+  - [beam_element, rev_belongs_to_beam, mesh_node]
+  - [mesh_node, belongs_to_plate, plate_element]
+  - [plate_element, rev_belongs_to_plate, mesh_node]
+  - [mesh_node, structural_link, mesh_node]
+
+# --- Per-node-type feature & target fields ---
+# mesh_node: coordinates + loads + support constraints
+mesh_node:
+  feature_fields: [X, Y, Z, Fx, Fy, Fz, Mx, My, Mz, Dx_fix, Dy_fix, Dz_fix, Rx_fix, Ry_fix, Rz_fix]
+  feature_dim: 15
+  target_fields: [Dx, Dy, Dz, Rx, Ry, Rz]
+  target_dim: 6
+  target_key: y_disp
+
+# beam_element: section props + material props + geometry
+beam_element:
+  feature_fields: [Area, Ix, Iy, Iz, ElasticModulus, PoissonRatio, UnitWeight, Length, CosX, CosY, CosZ]
+  feature_dim: 11
+  target_fields: [Fx_I, Fy_I, Fz_I, Mx_I, My_I, Mz_I, Fx_J, Fy_J, Fz_J, Mx_J, My_J, Mz_J]
+  target_dim: 12
+  target_key: y_force
+
+# plate_element: thickness + material props + plate metadata (no labels)
+plate_element:
+  feature_fields: [ThicknessValue, ElasticModulus, PoissonRatio, UnitWeight, BetaAngle, PlateType]
+  feature_dim: 6
+  # no target fields — plate force/stress labels are unavailable
+
+# Note: structural_link edge_attr (10-d):
+#   [Kx, Ky, Kz, Krx, Kry, Krz, BetaAngle, DistanceRatio, ElasticLinkType, is_rigid]
+#   Source: rigid_elastic_links.csv — modeled as mesh_node ↔ mesh_node interaction edge
+
+# --- Data files (relative to each sample directory) ---
+files:
+  nodes: "nodes.csv"
+  beam_elements: "beam_elements.csv"
+  beam_sections: "beam_sections.csv"
+  nodal_loads: "nodal_loads.csv"
+  beam_element_results: "beam_element_results.csv"
+  general_supports: "general_supports.csv"
+  materials: "materials.csv"
+  plate_elements: "plate_elements.csv"
+  thicknesses: "thicknesses.csv"
+  rigid_elastic_links: "rigid_elastic_links.csv"
+  node_displacement_results: "node_displacement_results.csv"
+
+# --- Save format ---
+save_format: "pt"
+use_reverse_edges: true
+use_train_only_stats: true
+
+# --- Build options ---
+build_options:
+  max_graphs: null       # debug: limit total graphs to build (null = all)
