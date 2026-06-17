@@ -1,0 +1,34 @@
+# ============================================================
+# train_baseline.yaml — Unified training config for baselines
+# Stage 2-A: MLP, Homogeneous GCN, Homogeneous GAT
+# ============================================================
+
+data:
+  processed_dir: "processed/hetero_graph_dataset_v2"
+  split_mode: "by_sample"           # by_sample | by_loadcase
+  batch_size: 8                     # override per model if needed
+  num_workers: 0                    # Windows: keep at 0
+
+train:
+  epochs: 100
+  lr: 0.001
+  weight_decay: 0.0001
+  optimizer: "adamw"                # adam | adamw | sgd
+  scheduler: "reduce_on_plateau"    # reduce_on_plateau | cosine | null
+  scheduler_patience: 10
+  scheduler_factor: 0.5
+  early_stopping_patience: 30
+  early_stopping_metric: "val_loss" # val_loss | val_disp_mae | val_force_mae
+  seed: 42
+  device: "auto"                    # auto | cuda | cpu
+  lambda_disp: 1.0
+  lambda_force: 1.0
+  loss_name: "mse"                  # mse | l1 | smooth_l1
+
+eval:
+  inverse_transform_metrics: true
+  save_predictions: true
+  prediction_sample_size: 5000
+
+output:
+  output_root: "outputs/baselines"

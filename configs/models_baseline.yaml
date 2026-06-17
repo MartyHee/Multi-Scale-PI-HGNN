@@ -1,0 +1,36 @@
+# ============================================================
+# models_baseline.yaml — Model configurations for Stage 2-A
+# ============================================================
+
+mlp_baseline:
+  mesh_feat_dim: 15
+  beam_feat_dim: 11
+  hidden_dims: [256, 128, 64]
+  dropout: 0.1
+  activation: "relu"
+  use_batch_norm: true
+
+homogeneous_gcn:
+  mesh_feat_dim: 15
+  beam_feat_dim: 11
+  plate_feat_dim: 6
+  hidden_dim: 128
+  num_layers: 3
+  dropout: 0.2
+  activation: "relu"
+  use_batch_norm: true
+  decoder_hidden_dims: [64, 32]
+  use_type_embed: true
+
+homogeneous_gat:
+  mesh_feat_dim: 15
+  beam_feat_dim: 11
+  plate_feat_dim: 6
+  hidden_dim: 128
+  num_layers: 3
+  gat_heads: 4
+  dropout: 0.2
+  activation: "relu"
+  use_batch_norm: true
+  decoder_hidden_dims: [64, 32]
+  use_type_embed: true
