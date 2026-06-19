@@ -1,0 +1,79 @@
+# =============================================================================
+# Multi-Scale PI-HGNN — requirements.txt
+# =============================================================================
+# Python >= 3.10 recommended.
+#
+# INSTALLATION NOTES
+# ==================
+#
+# GPU server (CUDA 11.8 toolkit, driver ≥ 12.x, 8× RTX 4090)
+# ------------------------------------------------------------
+# PyTorch and torch_scatter must be installed WITH the correct CUDA variant
+# from their respective index URLs.  Do NOT let pip resolve them from PyPI.
+#
+#   # 1) Create + activate conda environment
+#   conda create -n pi_hgnn python=3.10 -y
+#   conda activate pi_hgnn
+#
+#   # 2) Install PyTorch 2.6.0 + CUDA 11.8
+#   pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+#
+#   # 3) Install torch_scatter matching torch 2.6 + cu118
+#   pip install torch-scatter --index-url https://data.pyg.org/whl/torch-2.6.0+cu118
+#
+#   # 4) Install torch_geometric and the rest
+#   pip install torch_geometric==2.7.0
+#   pip install -r requirements.txt
+#
+# Verify installation:
+#   python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+#   python -c "import torch_scatter; print(torch_scatter.__version__)"
+#
+# Local Windows (CPU-only smoke tests)
+# --------------------------------------
+#   pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+#   pip install torch-scatter --index-url https://data.pyg.org/whl/torch-2.6.0+cpu
+#   pip install torch_geometric==2.7.0
+#   pip install -r requirements.txt
+# =============================================================================
+
+# ============================================================
+# Core ML framework
+# ------------------------------------------------------------
+# PyTorch: installed separately (see notes above); pinned here
+# for reference but pip will skip it if already installed.
+# torch==2.6.0
+# ============================================================
+
+# ============================================================
+# PyG ecosystem
+# ------------------------------------------------------------
+# torch_geometric — GNN layers, HeteroData, DataLoaders
+# torch_scatter  — scatter_mean (used by MLP baseline);
+#                  installed separately (see notes above)
+# ============================================================
+torch_geometric==2.7.0
+
+# ============================================================
+# Numerical & data processing
+# ============================================================
+numpy>=1.24,<2
+pandas>=1.4,<2
+scipy>=1.10
+
+# ============================================================
+# Config / I/O
+# ============================================================
+PyYAML>=6.0
+
+# ============================================================
+# Visualisation
+# ============================================================
+matplotlib>=3.7
+
+# ============================================================
+# Optional / dev utilities (not required by core training)
+# ============================================================
+# pytest            # run tests
+# pytest-cov        # coverage reports
+# tqdm              # progress bars
