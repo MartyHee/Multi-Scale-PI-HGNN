@@ -1,0 +1,38 @@
+# =============================================================================
+# server_mlp_full.yaml — Full MLP baseline training on hetero_graph_dataset_v2
+#
+# Purpose:
+#   Train MLP baseline on the full dataset (all samples, all load cases)
+#   using by_sample split.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_mlp_full.yaml
+#
+# Expected runtime: ~2-4 hours on 8x RTX 4090
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "mlp"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training (full — all graphs, 100 epochs)
+epochs: 100
+batch_size: 32
+# max_graphs omitted = use all graphs
+
+# Naming
+run_name: "server_mlp_full"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true
