@@ -25,6 +25,11 @@ train:
   lambda_force: 1.0
   loss_name: "mse"                  # mse | l1 | smooth_l1
 
+progress:
+  use_tqdm: true                    # show per-batch tqdm progress bar
+  log_interval: 20                  # fallback console-log interval when tqdm=False
+  leave_epoch_bar: false            # keep tqdm bar visible after epoch ends
+
 eval:
   inverse_transform_metrics: true
   save_predictions: true

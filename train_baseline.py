@@ -326,14 +326,14 @@ def generate_stage2a_summary(baseline_output_root: Path) -> None:
         force = test.get("force", {})
         combined_rel_mae = test.get("combined_rel_mae", None)
 
-        record["Disp R² (macro)"] = disp.get("macro_avg_r2", "?")
+        record["Disp R2 (macro)"] = disp.get("macro_avg_r2", "?")
         record["Disp MAE (macro)"] = disp.get("macro_avg_mae", "?")
-        record["Force R² (macro)"] = force.get("macro_avg_r2", "?")
+        record["Force R2 (macro)"] = force.get("macro_avg_r2", "?")
         record["Force MAE (macro)"] = force.get("macro_avg_mae", "?")
         record["RelMAE"] = combined_rel_mae if combined_rel_mae else "?"
 
         records.append(record)
-        print(f"  {model_name}: R²_disp={record['Disp R² (macro)']}, R²_force={record['Force R² (macro)']}")
+        print(f"  {model_name}: R2_disp={record['Disp R2 (macro)']}, R2_force={record['Force R2 (macro)']}")
 
     if not records:
         print("  No experiment results found.")
@@ -352,14 +352,14 @@ def generate_stage2a_summary(baseline_output_root: Path) -> None:
         f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n",
         f"Dataset: `processed/hetero_graph_dataset_v2`\n",
         "",
-        "| Method | Graph Type | Typed Message | Multi-scale | Physics Loss | Disp R² | Force R² | RelMAE | Params | Time (min) |",
+        "| Method | Graph Type | Typed Message | Multi-scale | Physics Loss | Disp R2 | Force R2 | RelMAE | Params | Time (min) |",
         "|--------|------------|---------------|-------------|--------------|--------:|---------:|-------:|-------:|-----------:|",
     ]
     for r in records:
         md_lines.append(
             f"| {r['Model']} | {r['Graph Type']} | {r['Typed Message']} | "
             f"{r['Multi-scale']} | {r['Physics Loss']} | "
-            f"{r['Disp R² (macro)']} | {r['Force R² (macro)']} | "
+            f"{r['Disp R2 (macro)']} | {r['Force R2 (macro)']} | "
             f"{r['RelMAE']} | {r['Params']:,} | {r['Total Time (min)']} |"
         )
 
@@ -404,6 +404,8 @@ def main(args: argparse.Namespace):
     if epochs_override:
         config.setdefault("train", {})["epochs"] = epochs_override
     config.setdefault("train", {})["device"] = str(device)
+    if args.run_name:
+        config["run_name"] = args.run_name
 
     print(f"\n  Split mode:    {split_mode}")
     print(f"  Batch size:    {batch_size}")
@@ -521,7 +523,11 @@ def main(args: argparse.Namespace):
 
     # ---- 7. Train ----
     print(f"\n[4/6] Training ...")
-    train_config = config.get("train", {})
+    train_config = config.get("train", {}).copy()
+    # Merge cross-section keys into train_config so the trainer can see them
+    train_config["progress"] = config.get("progress", {})
+    train_config["model_name"] = model_name
+    train_config["split_mode"] = split_mode
     trainer = BaselineTrainer(
         model=model,
         train_loader=train_loader,
@@ -611,8 +617,8 @@ def main(args: argparse.Namespace):
     print(f"  Total time:       {total_time:.1f}s ({total_time / 60:.1f} min)")
     print(f"  Best epoch:       {train_summary['best_epoch']}")
     print(f"  Early stopped:    {train_summary['early_stopped']}")
-    print(f"  Test Disp R²:     {test_results['disp_metrics']['macro_avg']['r2']:.4f}")
-    print(f"  Test Force R²:    {test_results['force_metrics']['macro_avg']['r2']:.4f}")
+    print(f"  Test Disp R2:     {test_results['disp_metrics']['macro_avg']['r2']:.4f}")
+    print(f"  Test Force R2:    {test_results['force_metrics']['macro_avg']['r2']:.4f}")
     print(f"  Test Disp MAE:    {test_results['disp_metrics']['macro_avg']['mae']:.6f}")
     print(f"  Test Force MAE:   {test_results['force_metrics']['macro_avg']['mae']:.6f}")
     print(f"  Combined RelMAE:  {combined_rel_mae:.6f}")
@@ -675,6 +681,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
                    help="Limit total graphs (for smoke test)")
     p.add_argument("--device", type=str, default=None,
                    help="Device override (auto | cuda | cpu)")
+    p.add_argument("--run-name", type=str, default=None,
+                   help="Descriptive run name (saved in config, no functional effect)")
     p.add_argument("--summarise-only", action="store_true",
                    help="Only generate summary from existing experiments, no training")
     return p.parse_args(argv)

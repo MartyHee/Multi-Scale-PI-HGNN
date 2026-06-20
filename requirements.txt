@@ -72,8 +72,12 @@ PyYAML>=6.0
 matplotlib>=3.7
 
 # ============================================================
+# Progress & visualisation
+# ============================================================
+tqdm>=4.66,<5
+
+# ============================================================
 # Optional / dev utilities (not required by core training)
 # ============================================================
 # pytest            # run tests
 # pytest-cov        # coverage reports
-# tqdm              # progress bars

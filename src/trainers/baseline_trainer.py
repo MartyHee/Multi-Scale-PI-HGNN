@@ -6,8 +6,10 @@ Supports:
   - Combined displacement + force loss with configurable weights
   - Per-epoch train / validation / test loops
   - Inverse-transform to physical-space metrics
-  - Early stopping with best-model checkpoint
-  - CSV logging and console progress
+  - Early stopping with best-model checkpoint (saved immediately on improvement)
+  - Atomic checkpoint writes for crash safety
+  - CSV logging with best-epoch tracking and tqdm progress bars
+  - Configurable logging interval and progress display
 
 Usage::
 
@@ -29,6 +31,8 @@ Usage::
 
 from __future__ import annotations
 
+import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -42,6 +46,15 @@ from src.trainers.losses import CombinedLoss
 from src.utils.experiment import CSVLogger, plot_loss_curve, plot_metric_curve
 from src.utils.metrics import compute_all_metrics
 
+# ---------- optional tqdm ----------
+_HAVE_TQDM = False
+try:
+    from tqdm.auto import tqdm as _tqdm
+
+    _HAVE_TQDM = True
+except ImportError:
+    pass
+
 # ---------- optimiser registry ----------
 
 OPTIM_FACTORY = {
@@ -49,6 +62,18 @@ OPTIM_FACTORY = {
     "adamw": torch.optim.AdamW,
     "sgd": torch.optim.SGD,
 }
+
+
+def _atomic_save(state: dict, path: Path) -> None:
+    """Write ``state`` via temp file then atomic rename (safe against crash)."""
+    tmp = path.with_suffix(".pt.tmp")
+    torch.save(state, tmp)
+    tmp.rename(path)
+    # On Windows the .tmp suffix remains if rename was atomic enough;
+    # clean up any stale tmp files silently.
+    stale = path.with_suffix(".pt.tmp")
+    if stale.exists():
+        stale.unlink(missing_ok=True)
 
 
 class BaselineTrainer:
@@ -91,6 +116,12 @@ class BaselineTrainer:
         self.disp_std = disp_std
         self.force_mean = force_mean
         self.force_std = force_std
+
+        # ---- Progress / logging config ----
+        prog_cfg = config.get("progress", {})
+        self.use_tqdm = prog_cfg.get("use_tqdm", False) and _HAVE_TQDM
+        self.log_interval = prog_cfg.get("log_interval", 20)
+        self.leave_epoch_bar = prog_cfg.get("leave_epoch_bar", False)
 
         # ---- Combined loss ----
         self.loss_fn = CombinedLoss(
@@ -148,6 +179,9 @@ class BaselineTrainer:
             "lr": [],
             "epoch_time": [],
         }
+        # Track best inside fit() for immediate checkpoint saving
+        self._best_val_loss: float = float("inf")
+        self._best_epoch: int = 0
 
     # ============================================================
     # Core loops
@@ -165,7 +199,17 @@ class BaselineTrainer:
         total_force_loss = 0.0
         num_batches = 0
 
-        for batch_idx, batch in enumerate(self.train_loader):
+        iterator = self.train_loader
+        if self.use_tqdm:
+            iterator = _tqdm(
+                self.train_loader,
+                desc=f"  Epoch {self.current_epoch}",
+                leave=self.leave_epoch_bar,
+                unit="batch",
+                ncols=100,
+            )
+
+        for batch_idx, batch in enumerate(iterator):
             batch = batch.to(self.device)
 
             self.optimizer.zero_grad()
@@ -183,7 +227,14 @@ class BaselineTrainer:
             total_force_loss += loss_force.item()
             num_batches += 1
 
-            if (batch_idx + 1) % max(1, self.config.get("log_interval", 500)) == 0:
+            # Update tqdm postfix or log periodically
+            if self.use_tqdm and hasattr(iterator, "set_postfix"):
+                iterator.set_postfix({
+                    "loss": f"{loss_total.item():.4f}",
+                    "D": f"{loss_disp.item():.4f}",
+                    "F": f"{loss_force.item():.4f}",
+                })
+            elif not self.use_tqdm and (batch_idx + 1) % max(1, self.log_interval) == 0:
                 print(
                     f"    Epoch {self.current_epoch} | Batch {batch_idx + 1}/{len(self.train_loader)} "
                     f"| Loss: {loss_total.item():.4f} (D:{loss_disp.item():.4f} F:{loss_force.item():.4f})"
@@ -279,6 +330,10 @@ class BaselineTrainer:
     def fit(self) -> Dict:
         """Run the full training loop with early stopping and checkpointing.
 
+        Best-model checkpoint is saved **immediately** when val loss improves
+        (atomic write via temp-file + rename).  Full last-checkpoint (model +
+        optimizer + config) is saved each epoch for resume support.
+
         Returns:
             Summary dict with best epoch, best metrics, total time.
         """
@@ -291,36 +346,46 @@ class BaselineTrainer:
         print(f"Train samples: {len(self.train_loader.dataset)}")
         print(f"Val samples:   {len(self.val_loader.dataset)}")
         print(f"Batch size:    {self.train_loader.batch_size}")
+        print(f"Progress bar:  {'tqdm' if self.use_tqdm else 'console log'}")
         print(f"{'=' * 60}\n")
 
-        # CSV logger
+        # CSV logger with best-epoch tracking columns
         csv_logger = CSVLogger(
             self.experiment_dir / "train_log.csv",
             fieldnames=[
                 "epoch", "train_loss", "val_loss",
                 "val_disp_mae", "val_disp_r2",
                 "val_force_mae", "val_force_r2",
-                "lr", "epoch_time",
+                "lr", "epoch_time_sec",
+                "best_epoch", "best_val_loss",
             ],
         )
 
+        # Build last-checkpoint skeleton (filled each epoch)
+        _ckpt_base = {
+            "model_name": self.config.get("model_name", "unknown"),
+            "split_mode": self.config.get("data", {}).get("split_mode", "by_sample"),
+            "config": self.config,
+        }
+
         t_start = time.time()
+        early_stopped = False
 
         for epoch in range(1, epochs + 1):
             self.current_epoch = epoch
             t_epoch = time.time()
 
-            # Train
+            # ---- Train ----
             train_loss, train_disp_loss, train_force_loss = self._train_epoch()
 
-            # Validate
+            # ---- Validate ----
             val_results = self._val_epoch()
             val_loss = val_results["val_loss"]
 
-            # LR
+            # ---- LR ----
             current_lr = self.optimizer.param_groups[0]["lr"]
 
-            # Scheduler step
+            # ---- Scheduler step ----
             if self.scheduler is not None:
                 if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                     self.scheduler.step(val_loss)
@@ -329,7 +394,7 @@ class BaselineTrainer:
 
             epoch_time = time.time() - t_epoch
 
-            # Record history
+            # ---- Record history ----
             self.history["train_loss"].append(train_loss)
             self.history["val_loss"].append(val_loss)
             self.history["val_disp_mae"].append(val_results["val_disp_mae"])
@@ -339,7 +404,28 @@ class BaselineTrainer:
             self.history["lr"].append(current_lr)
             self.history["epoch_time"].append(epoch_time)
 
-            # CSV row
+            # ---- Save best_model.pt immediately on improvement ----
+            is_best = val_loss < self._best_val_loss
+            if is_best:
+                self._best_val_loss = val_loss
+                self._best_epoch = epoch
+                best_path = self.experiment_dir / "best_model.pt"
+                _atomic_save(self.model.state_dict(), best_path)
+
+            # ---- Save last_checkpoint.pt each epoch ----
+            last_ckpt = {
+                **_ckpt_base,
+                "epoch": epoch,
+                "model_state_dict": self.model.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "best_val_loss": self._best_val_loss,
+                "best_epoch": self._best_epoch,
+            }
+            _atomic_save(last_ckpt, self.experiment_dir / "last_checkpoint.pt")
+            # Also keep a lighter last_model.pt (state_dict only)
+            _atomic_save(self.model.state_dict(), self.experiment_dir / "last_model.pt")
+
+            # ---- CSV row ----
             csv_logger.append({
                 "epoch": epoch,
                 "train_loss": f"{train_loss:.6f}",
@@ -349,10 +435,16 @@ class BaselineTrainer:
                 "val_force_mae": f"{val_results['val_force_mae']:.6f}",
                 "val_force_r2": f"{val_results['val_force_r2']:.6f}",
                 "lr": f"{current_lr:.8f}",
-                "epoch_time": f"{epoch_time:.2f}",
+                "epoch_time_sec": f"{epoch_time:.2f}",
+                "best_epoch": self._best_epoch,
+                "best_val_loss": f"{self._best_val_loss:.6f}",
             })
 
-            # Console log
+            # ---- Console log ----
+            elapsed = time.time() - t_start
+            avg_epoch_time = elapsed / epoch
+            remaining = avg_epoch_time * (epochs - epoch)
+            best_marker = " *BEST" if is_best else ""
             print(
                 f"Epoch {epoch:3d}/{epochs} | "
                 f"Train: {train_loss:.4f} | "
@@ -362,10 +454,11 @@ class BaselineTrainer:
                 f"D-R2: {val_results['val_disp_r2']:.4f} | "
                 f"F-R2: {val_results['val_force_r2']:.4f} | "
                 f"LR: {current_lr:.2e} | "
-                f"{epoch_time:.1f}s"
+                f"{epoch_time:.1f}s | "
+                f"ETA:{remaining:.0f}s{best_marker}"
             )
 
-            # Early stopping (monitor val_loss by default)
+            # ---- Early stopping ----
             if self.early_stopping is not None:
                 es_metric = self.config.get("early_stopping_metric", "val_loss")
                 monitor_value = val_loss if es_metric == "val_loss" else val_results.get(es_metric, val_loss)
@@ -378,33 +471,29 @@ class BaselineTrainer:
                         f"Best epoch: {self.early_stopping.best_epoch} "
                         f"(best {es_metric}: {self.early_stopping.best_value:.6f})"
                     )
+                    early_stopped = True
                     break
 
-        # End of training
+        # ---- End of training loop ----
         total_time = time.time() - t_start
         csv_logger.close()
 
-        # Determine best epoch and restore weights
+        # Restore best weights
         if self.early_stopping is not None and self.early_stopping.best_state_dict is not None:
             best_epoch = self.early_stopping.best_epoch
             best_val_metric = self.early_stopping.best_value
-            early_stopped = self.early_stopping.should_stop
             self.early_stopping.load_best(self.model)
         else:
-            best_idx = int(torch.tensor(self.history["val_loss"]).argmin())
-            best_epoch = best_idx + 1
-            best_val_metric = self.history["val_loss"][best_idx]
-            early_stopped = False
-
-        # Save best model
-        best_model_path = self.experiment_dir / "best_model.pt"
-        torch.save(self.model.state_dict(), best_model_path)
-        print(f"\n  [ok] Best model (epoch {best_epoch}) saved: {best_model_path}")
-
-        # Save last model
-        last_model_path = self.experiment_dir / "last_model.pt"
-        torch.save(self.model.state_dict(), last_model_path)
-        print(f"  [ok] Last model saved: {last_model_path}")
+            # Fallback: use tracked best
+            best_epoch = self._best_epoch
+            best_val_metric = self._best_val_loss
+            # Load from saved best_model.pt if exists
+            best_path = self.experiment_dir / "best_model.pt"
+            if best_path.exists():
+                try:
+                    self.model.load_state_dict(torch.load(best_path, map_location=self.device, weights_only=True))
+                except Exception:
+                    pass
 
         # Plot curves
         plot_loss_curve(
@@ -424,7 +513,7 @@ class BaselineTrainer:
         )
 
         print(f"\n  Total training time: {total_time:.1f}s ({total_time / 60:.1f} min)")
-        print(f"  Best epoch: {best_epoch} | Best val metric: {best_val_metric:.6f}")
+        print(f"  Best epoch: {best_epoch} | Best val loss: {best_val_metric:.6f}")
 
         summary = {
             "best_epoch": best_epoch,

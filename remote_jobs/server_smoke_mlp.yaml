@@ -1,0 +1,43 @@
+# =============================================================================
+# server_smoke_mlp.yaml — Server-side smoke test for MLP baseline
+#
+# Purpose:
+#   Verify that the full training pipeline works on the GPU server:
+#     - dataset loading
+#     - model forward/backward on GPU
+#     - train_log.csv generation
+#     - best_model.pt / last_model.pt
+#     - metrics_summary.json
+#     - artifact packaging
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_smoke_mlp.yaml
+#
+# Expected runtime: < 2 minutes on 8× RTX 4090
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "mlp"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 2
+
+# Training (very small — 2 epochs, 128 graphs)
+epochs: 2
+batch_size: 32
+max_graphs: 128
+
+# Naming
+run_name: "server_smoke_mlp"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true
