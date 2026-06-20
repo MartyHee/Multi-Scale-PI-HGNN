@@ -61,89 +61,70 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
-ARTIFACT_NAME="${JOB_NAME}_${TIMESTAMP}"
-ARTIFACT_DIR="${PROJECT_DIR}/remote_artifacts/${ARTIFACT_NAME}"
-ARCHIVE="${PROJECT_DIR}/remote_artifacts/${ARTIFACT_NAME}.tar.gz"
+ARTIFACT_DIR="${PROJECT_DIR}/remote_artifacts"
+ARTIFACT_STAGING="${ARTIFACT_DIR}/${JOB_NAME}_${TIMESTAMP}"
+ARCHIVE_NAME="${JOB_NAME}_${TIMESTAMP}.tar.gz"
+ARCHIVE_PATH="${ARTIFACT_DIR}/${ARCHIVE_NAME}"
 
-mkdir -p "$ARTIFACT_DIR"
+ARTIFACT_FILE_COUNT=0
+
+mkdir -p "$ARTIFACT_STAGING"
 
 echo "=========================================="
 echo " Packaging results"
 echo "=========================================="
-echo "  Run dir:   ${RUN_DIR}"
-echo "  Job:       ${JOB_NAME}"
-echo "  Artifact:  ${ARCHIVE}"
+echo "  Run dir:  ${RUN_DIR}"
+echo "  Job:      ${JOB_NAME}"
+echo "  Archive:  ${ARCHIVE_PATH}"
 
-# --- Copy files ---
-
-# 1. Config & metadata
-for f in config_resolved.yaml model_summary.json; do
-    src="${RUN_DIR}/${f}"
+# --- Helper: safe-copy a file (no failure if missing) ---
+_safe_copy() {
+    local src="$1"
+    local dst_dir="$2"
     if [ -f "$src" ]; then
-        cp "$src" "${ARTIFACT_DIR}/"
-        echo "  [ok]  ${f}"
+        cp "$src" "$dst_dir/" 2>/dev/null || true
+        ARTIFACT_FILE_COUNT=$((ARTIFACT_FILE_COUNT + 1))
+        echo "  [ok]  $(basename "$src")"
     fi
-done
+}
+
+# 1. Core config & metadata
+_safe_copy "${RUN_DIR}/config_resolved.yaml" "$ARTIFACT_STAGING"
+_safe_copy "${RUN_DIR}/model_summary.json" "$ARTIFACT_STAGING"
 
 # 2. Training log
-src="${RUN_DIR}/train_log.csv"
-if [ -f "$src" ]; then
-    cp "$src" "${ARTIFACT_DIR}/"
-    echo "  [ok]  train_log.csv"
-fi
+_safe_copy "${RUN_DIR}/train_log.csv" "$ARTIFACT_STAGING"
 
 # 3. Metrics
-for f in metrics_summary.json metrics_test.json; do
-    src="${RUN_DIR}/${f}"
-    if [ -f "$src" ]; then
-        cp "$src" "${ARTIFACT_DIR}/"
-        echo "  [ok]  ${f}"
-    fi
-done
+_safe_copy "${RUN_DIR}/metrics_summary.json" "$ARTIFACT_STAGING"
+_safe_copy "${RUN_DIR}/metrics_test.json" "$ARTIFACT_STAGING"
 
-# 4. Plots
-for pat in loss_curve.png metric_curve*.png; do
+# 4. Plots (glob — loop over actual matches, not pattern strings)
+for pat in "loss_curve.png" "metric_curve"*.png; do
     # shellcheck disable=SC2086
-    found=$(find "$RUN_DIR" -maxdepth 1 -name "$pat" 2>/dev/null || true)
-    if [ -n "$found" ]; then
-        # shellcheck disable=SC2086
-        cp $found "$ARTIFACT_DIR/" 2>/dev/null || true
-        echo "  [ok]  $(basename $pat) (glob)"
-    fi
+    while IFS= read -r -d '' f; do
+        _safe_copy "$f" "$ARTIFACT_STAGING"
+    done < <(find "$RUN_DIR" -maxdepth 1 -name "$pat" -print0 2>/dev/null || true)
 done
 
-# 5. Best model
-src="${RUN_DIR}/best_model.pt"
-if [ -f "$src" ]; then
-    cp "$src" "${ARTIFACT_DIR}/"
-    SIZE=$(stat -c%s "$src" 2>/dev/null || stat -f%z "$src" 2>/dev/null)
-    echo "  [ok]  best_model.pt  (${SIZE} bytes)"
-fi
+# 5. Best model (always included if exists)
+_safe_copy "${RUN_DIR}/best_model.pt" "$ARTIFACT_STAGING"
 
-# 6. Last model (optional)
+# 6. Last model / checkpoint (optional, --include-last)
 if [ "$INCLUDE_LAST" = true ]; then
-    for f in last_model.pt last_checkpoint.pt; do
-        src="${RUN_DIR}/${f}"
-        if [ -f "$src" ]; then
-            cp "$src" "${ARTIFACT_DIR}/"
-            echo "  [ok]  ${f}"
-        fi
-    done
+    _safe_copy "${RUN_DIR}/last_model.pt" "$ARTIFACT_STAGING"
+    _safe_copy "${RUN_DIR}/last_checkpoint.pt" "$ARTIFACT_STAGING"
 fi
 
 # 7. Job yaml (look in remote_jobs/ for a matching name)
 JOB_YAML="${PROJECT_DIR}/remote_jobs/${JOB_NAME}.yaml"
 if [ ! -f "$JOB_YAML" ]; then
-    # try broader: match any yaml whose basename contains job_name
     JOB_YAML=$(find "${PROJECT_DIR}/remote_jobs" -maxdepth 1 -name "${JOB_NAME}*.yaml" 2>/dev/null | head -1 || true)
 fi
-if [ -n "$JOB_YAML" ] && [ -f "$JOB_YAML" ]; then
-    cp "$JOB_YAML" "${ARTIFACT_DIR}/"
-    echo "  [ok]  $(basename "$JOB_YAML")"
-fi
+_safe_copy "$JOB_YAML" "$ARTIFACT_STAGING"
 
 # 8. Git info
-GIT_INFO="${ARTIFACT_DIR}/git_info.txt"
+GIT_INFO_PATH="${ARTIFACT_STAGING}/git_info.txt"
 {
     echo "Git branch: $(cd "$PROJECT_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
     echo "Git commit: $(cd "$PROJECT_DIR" && git rev-parse HEAD 2>/dev/null || echo 'unknown')"
@@ -151,41 +132,51 @@ GIT_INFO="${ARTIFACT_DIR}/git_info.txt"
     echo "Hostname:   $(hostname 2>/dev/null || echo 'unknown')"
     echo "User:       $(whoami 2>/dev/null || echo 'unknown')"
     echo "Date:       $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-} > "$GIT_INFO"
+} > "$GIT_INFO_PATH"
+ARTIFACT_FILE_COUNT=$((ARTIFACT_FILE_COUNT + 1))
 echo "  [ok]  git_info.txt"
 
 # 9. Server log (look in logs/remote/ for matching job name)
 SERVER_LOG=$(find "${PROJECT_DIR}/logs/remote" -maxdepth 1 -name "${JOB_NAME}*.log" 2>/dev/null | sort | tail -1 || true)
-if [ -n "$SERVER_LOG" ] && [ -f "$SERVER_LOG" ]; then
-    cp "$SERVER_LOG" "${ARTIFACT_DIR}/server_output.log"
-    echo "  [ok]  server_output.log"
+_safe_copy "$SERVER_LOG" "$ARTIFACT_STAGING"
+# Rename to server_output.log for consistency
+if [ -f "${ARTIFACT_STAGING}/$(basename "$SERVER_LOG")" ]; then
+    mv "${ARTIFACT_STAGING}/$(basename "$SERVER_LOG")" "${ARTIFACT_STAGING}/server_output.log" 2>/dev/null || true
 fi
 
 # 10. Error traceback (look for common error files in run_dir)
 for err_pat in "error*.txt" "traceback*.txt" "*.stderr"; do
-    # shellcheck disable=SC2086
-    err_found=$(find "$RUN_DIR" -maxdepth 1 -name "$err_pat" 2>/dev/null || true)
-    if [ -n "$err_found" ]; then
-        # shellcheck disable=SC2086
-        cp $err_found "$ARTIFACT_DIR/" 2>/dev/null || true
-        echo "  [ok]  $(basename $err_pat) (error log)"
-    fi
+    while IFS= read -r -d '' f; do
+        _safe_copy "$f" "$ARTIFACT_STAGING"
+    done < <(find "$RUN_DIR" -maxdepth 1 -name "$err_pat" -print0 2>/dev/null || true)
 done
 
 # --- Create archive ---
-cd "$PROJECT_DIR/remote_artifacts"
-tar czf "${ARCHIVE_NAME}.tar.gz" "$ARTIFACT_NAME" 2>/dev/null || {
-    # fallback to tar without cd
-    cd "$PROJECT_DIR"
-    tar czf "$ARCHIVE" -C "$(dirname "$ARTIFACT_DIR")" "$ARTIFACT_NAME"
-}
-rm -rf "$ARTIFACT_DIR"
+echo ""
+echo "  Files staged: ${ARTIFACT_FILE_COUNT}"
+echo "  Creating archive ..."
 
-ARCHIVE_SIZE=$(stat -c%s "$ARCHIVE" 2>/dev/null || stat -f%z "$ARCHIVE" 2>/dev/null)
+# Use tar -C to avoid cd; if the staging dir is empty (no files were copied),
+# still create an archive containing an empty directory marker.
+if [ "$ARTIFACT_FILE_COUNT" -gt 0 ]; then
+    tar czf "$ARCHIVE_PATH" -C "$ARTIFACT_DIR" "${JOB_NAME}_${TIMESTAMP}" 2>/dev/null
+    ARCHIVE_OK=$?
+else
+    # Create minimal archive with a placeholder
+    echo "placeholder - no result files found" > "${ARTIFACT_STAGING}/README.txt"
+    tar czf "$ARCHIVE_PATH" -C "$ARTIFACT_DIR" "${JOB_NAME}_${TIMESTAMP}" 2>/dev/null
+    ARCHIVE_OK=$?
+fi
+
+rm -rf "$ARTIFACT_STAGING"
+
+ARCHIVE_SIZE=$(stat -c%s "$ARCHIVE_PATH" 2>/dev/null || stat -f%z "$ARCHIVE_PATH" 2>/dev/null)
 echo ""
 echo "=========================================="
 echo " Artifact ready"
 echo "=========================================="
-echo "  Archive: ${ARCHIVE}"
-echo "  Size:    ${ARCHIVE_SIZE} bytes ($(( ARCHIVE_SIZE / 1024 )) KB)"
+echo "  Archive: ${ARCHIVE_PATH}"
+echo "  Size:    ${ARCHIVE_SIZE} bytes ($(( ARCHIVE_SIZE / 1024 )) KB) [${ARCHIVE_SIZE} bytes]"
+echo "  Contents:"
+tar -tzf "$ARCHIVE_PATH" 2>/dev/null | sed 's/^/    /' || echo "    (unable to list)"
 echo "=========================================="
