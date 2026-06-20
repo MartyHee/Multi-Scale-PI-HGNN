@@ -1,0 +1,48 @@
+# =============================================================================
+# server_gat_full.yaml — Full Homogeneous GAT baseline training
+#
+# Purpose:
+#   Train HomogeneousGAT on the full hetero_graph_dataset_v2.
+#   Stage 2-A: homogeneous graph attention baseline.
+#
+# Notes:
+#   - GAT uses multi-head attention (4 heads, hidden_dim=128).
+#     This is still homogeneous attention, NOT typed/relation-specific attention.
+#   - GAT does NOT distinguish edge types (no relation-specific message passing).
+#   - batch_size=16 is recommended as default. If OOM on 8× RTX 4090,
+#     reduce to batch_size=8 and re-run (note: GAT with 4 heads × 3534 nodes
+#     per graph has higher memory footprint than GCN).
+#   - The purpose of this baseline is to verify whether homogeneous graph
+#     attention outperforms homogeneous GCN or the non-graph MLP.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_gat_full.yaml
+#
+# Expected runtime: ~4-8 hours on 8× RTX 4090
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "gat"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training (full — all graphs, 100 epochs)
+epochs: 100
+batch_size: 16
+# max_graphs omitted = use all graphs
+
+# Naming
+run_name: "server_gat_full"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true
