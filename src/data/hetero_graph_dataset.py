@@ -116,7 +116,13 @@ class HeteroGraphDataset(Dataset):
     def __getitem__(self, idx: int) -> HeteroData:
         """Load and return one HeteroData graph."""
         row = self._index.iloc[idx]
-        graph_path = self.processed_dir / row["graph_file"]
+
+        # Cross-platform path normalisation: index.csv was generated on Windows
+        # and contains backslash separators (e.g. "graphs\\1274\\0001.pt").
+        # On Linux backslash is not a path separator, so we normalise to "/"
+        # before passing to pathlib.Path.
+        graph_rel = str(row["graph_file"]).replace("\\", "/")
+        graph_path = self.processed_dir / graph_rel
         if not graph_path.is_file():
             raise FileNotFoundError(
                 f"Graph file not found: {graph_path} "
@@ -137,6 +143,51 @@ class HeteroGraphDataset(Dataset):
     def get_index(self) -> pd.DataFrame:
         """Return the (filtered) index DataFrame for inspection."""
         return self._index.copy()
+
+    @staticmethod
+    def check_path_normalisation(processed_dir: Union[str, Path], n: int = 5) -> dict:
+        """Check that graph_file paths from index.csv resolve correctly.
+
+        Reads the first ``n`` entries from ``index.csv``, normalises paths, and
+        reports whether each graph file exists.  Useful as a cross-platform
+        sanity check after copying the dataset to Linux.
+
+        Returns a dict with ``total``, ``ok``, ``failed``, and ``samples``.
+        """
+        processed_dir = Path(processed_dir).resolve()
+        index_path = processed_dir / "index.csv"
+        if not index_path.is_file():
+            return {"error": f"index.csv not found: {index_path}"}
+
+        import pandas as pd
+        index = pd.read_csv(index_path)
+        samples = []
+        ok = 0
+        failed = 0
+
+        for i in range(min(n, len(index))):
+            raw = str(index.iloc[i]["graph_file"])
+            norm = raw.replace("\\", "/")
+            full = processed_dir / norm
+            exists = full.is_file()
+            samples.append({
+                "raw": raw,
+                "normalised": str(norm),
+                "full_path": str(full),
+                "exists": exists,
+            })
+            if exists:
+                ok += 1
+            else:
+                failed += 1
+
+        return {
+            "total": len(index),
+            "checked": len(samples),
+            "ok": ok,
+            "failed": failed,
+            "samples": samples,
+        }
 
     def __repr__(self) -> str:
         return (
