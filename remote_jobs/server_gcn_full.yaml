@@ -1,0 +1,43 @@
+# =============================================================================
+# server_gcn_full.yaml — Full Homogeneous GCN baseline training
+#
+# Purpose:
+#   Train HomogeneousGCN on the full hetero_graph_dataset_v2.
+#   Stage 2-A: homogeneous graph convolution baseline.
+#
+# Notes:
+#   - batch_size 16 is conservative for stability. If GPU memory permits
+#     and the model converges smoothly early on, batch_size 32 is also viable.
+#   - num_workers=4 matches the effective CPU core availability.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_gcn_full.yaml
+#
+# Expected runtime: ~3-6 hours on 8× RTX 4090
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "gcn"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training (full — all graphs, 100 epochs)
+epochs: 100
+batch_size: 16
+# max_graphs omitted = use all graphs
+
+# Naming
+run_name: "server_gcn_full"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true
