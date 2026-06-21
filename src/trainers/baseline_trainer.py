@@ -65,15 +65,12 @@ OPTIM_FACTORY = {
 
 
 def _atomic_save(state: dict, path: Path) -> None:
-    """Write ``state`` via temp file then atomic rename (safe against crash)."""
+    """Write ``state`` via temp file then atomic replace (safe against crash)."""
     tmp = path.with_suffix(".pt.tmp")
     torch.save(state, tmp)
-    tmp.rename(path)
-    # On Windows the .tmp suffix remains if rename was atomic enough;
-    # clean up any stale tmp files silently.
-    stale = path.with_suffix(".pt.tmp")
-    if stale.exists():
-        stale.unlink(missing_ok=True)
+    # Use os.replace for cross-platform atomic overwrite (rename on
+    # POSIX, MoveFileEx on Windows).
+    os.replace(str(tmp), str(path))
 
 
 class BaselineTrainer:

@@ -1,0 +1,52 @@
+# =============================================================================
+# server_rgcn_full.yaml — Full HeteroRGCN baseline training
+#
+# Purpose:
+#   Train HeteroRGCNBaseline on the full hetero_graph_dataset_v2.
+#   Stage 2-B: typed/relation-specific message passing baseline.
+#
+# Notes:
+#   - Uses HeteroConv + SAGEConv for relation-specific message passing
+#     (5 edge types, each with independent convolution weights).
+#   - This is the FIRST typed-relation baseline, answering whether
+#     preserving edge-type identity recovers performance lost by
+#     homogeneous GCN/GAT in Stage 2-A.
+#   - No edge_attr, no physics gating, no macro graph — pure typed baseline.
+#   - batch_size=16 is recommended. If OOM on 8× RTX 4090, reduce to 8.
+#     (RGCN has ~5× more conv params than GCN due to per-edge-type weights.)
+#   - Expected runtime: ~3-6 hours on 8× RTX 4090.
+#
+# Reference:
+#   - RGCN: Schlichtkrull et al., ESWC 2018
+#     https://arxiv.org/abs/1703.06103
+#   - PyG HeteroConv: https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.HeteroConv.html
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_rgcn_full.yaml
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "rgcn"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training (full — all graphs, 100 epochs)
+epochs: 100
+batch_size: 16
+# max_graphs omitted = use all graphs
+
+# Naming
+run_name: "server_rgcn_full"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true

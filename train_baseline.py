@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-train_baseline.py — Unified training entry point for Stage 2-A baselines.
+train_baseline.py — Unified training entry point for Stage 2 baseline suite.
 
 Supports:
 
   - ``mlp``          — MLPBaseline (non-graph)
   - ``gcn``          — HomogeneousGCN
   - ``gat``          — HomogeneousGAT
+  - ``rgcn``         — HeteroRGCNBaseline (relation-specific typed message passing)
 
 All models use ``processed/hetero_graph_dataset_v2`` and the
 ``HeteroFeatureScaler`` for standardisation.
@@ -55,6 +56,7 @@ from src.models.baselines import (
     MLPBaseline,
     HomogeneousGCN,
     HomogeneousGAT,
+    HeteroRGCNBaseline,
 )
 from src.trainers.baseline_trainer import BaselineTrainer
 from src.utils.experiment import create_experiment_dir, save_resolved_config
@@ -75,12 +77,14 @@ MODEL_NAMES_MAP = {
     "mlp": "MLPBaseline",
     "gcn": "HomogeneousGCN",
     "gat": "HomogeneousGAT",
+    "rgcn": "HeteroRGCNBaseline",
 }
 
 MODEL_CONFIG_KEYS = {
     "mlp": "mlp_baseline",
     "gcn": "homogeneous_gcn",
     "gat": "homogeneous_gat",
+    "rgcn": "hetero_rgcn",
 }
 
 
@@ -151,6 +155,18 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             use_batch_norm=model_cfg.get("use_batch_norm", True),
             decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
             use_type_embed=model_cfg.get("use_type_embed", True),
+        )
+    elif model_name == "rgcn":
+        model = HeteroRGCNBaseline(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 3),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
         )
     else:
         raise ValueError(f"Unknown model '{model_name}'. Options: {list(MODEL_NAMES_MAP.keys())}")
@@ -654,6 +670,15 @@ def _get_input_construction_desc(model_name: str, model_cfg: Dict) -> str:
             "but uses GATConv (multi-head attention) instead of GCNConv. "
             "Attention is standard node-level attention, not relation-type specific."
         )
+    elif model_name == "rgcn":
+        return (
+            "HeteroRGCNBaseline: Type-specific Linear projections per node type "
+            "(mesh_node 15-dim, beam_element 11-dim, plate_element 6-dim) to shared "
+            "hidden_dim. Relation-specific message passing via HeteroConv + SAGEConv "
+            "on all 5 edge types independently. Per-node-type LayerNorm. "
+            "MLPHead decoders for disp (6) and force (12). "
+            "No edge_attr used — this is a standard typed-relation baseline."
+        )
     return ""
 
 
@@ -662,7 +687,7 @@ def _get_input_construction_desc(model_name: str, model_cfg: Dict) -> str:
 # ============================================================
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Stage 2-A Baseline Training")
+    p = argparse.ArgumentParser(description="Stage 2 Baseline Training (MLP / GCN / GAT / RGCN)")
     p.add_argument("--model", type=str, required=True,
                    choices=list(MODEL_NAMES_MAP.keys()),
                    help=f"Model to train: {list(MODEL_NAMES_MAP.keys())}")

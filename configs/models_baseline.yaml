@@ -34,3 +34,18 @@ homogeneous_gat:
   use_batch_norm: true
   decoder_hidden_dims: [64, 32]
   use_type_embed: true
+
+# ============================================================
+# Stage 2-B: Typed message passing baselines
+# ============================================================
+
+hetero_rgcn:
+  mesh_feat_dim: 15
+  beam_feat_dim: 11
+  plate_feat_dim: 6
+  hidden_dim: 128
+  num_layers: 3
+  dropout: 0.1
+  activation: "relu"
+  use_layer_norm: true
+  decoder_hidden_dims: [64, 32]
