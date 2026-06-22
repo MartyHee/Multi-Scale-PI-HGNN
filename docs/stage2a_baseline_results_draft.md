@@ -14,8 +14,9 @@
 | GCN | homogeneous | no | no | no | 76,050 | 96 | 6891.3s (114.9min) | 0.8476 | 0.9696 | 0.000274 | 22604.84 | 0.1227 | `outputs/baselines/GCN/20260620123654/` | `server_gcn_full_20260620143146.tar.gz` | ✅ completed |
 | GAT | homogeneous | no | no | no | 76,818 | 88 | 7688.6s (128.1min) | 0.8421 | 0.9632 | 0.000283 | 25673.94 | 0.1361 | `outputs/baselines/GAT/20260620161447/` | `server_gat_full_20260620182256.tar.gz` | ✅ completed |
 | **RGCN** | **heterogeneous** | **relation-specific** | **no** | **no** | **520,338** | **90** | **8142.3s (135.7min)** | **0.9366** | **0.9878** | **0.000197** | **12305.24** | **0.0724** | `outputs/baselines/RGCN/20260621042016/` | `server_rgcn_full_20260621063600.tar.gz` | ✅ completed |
+| **HGT** 🏆 | **heterogeneous** | **typed attention** | **no** | **no** | **744,279** | **99** | **21188.9s (353.1min)** | **0.9769** | **0.9891** | **0.000181** | **11750.58** | **0.0683** | `outputs/baselines/HGT/20260622103144/` | `server_hgt_full_20260622162513.tar.gz` | ✅ completed |
 
-**New ranking: RGCN > MLP > GCN > GAT** — RGCN dominates on all 5 metrics.
+**Final ranking: HGT > RGCN > MLP > GCN > GAT**
 
 ## 1. MLP Details
 
@@ -60,41 +61,41 @@
 
 ### 4.1 Overall Metrics
 
-| Metric | MLP | GCN | GAT | **RGCN** | Ordering |
-|--------|-----|-----|-----|----------|----------|
-| Test Disp R² | 0.8554 | 0.8476 | 0.8421 | **0.9366** | **RGCN > MLP > GCN > GAT** |
-| Test Force R² | 0.9824 | 0.9696 | 0.9632 | **0.9878** | **RGCN > MLP > GCN > GAT** |
-| Combined RelMAE | 0.0884 | 0.1227 | 0.1361 | **0.0724** | **RGCN > MLP > GCN > GAT** |
-| Params | 96,274 | 76,050 | 76,818 | 520,338 | — |
-| Train Time | **56.9min** | 114.9min | 128.1min | 135.7min | GAT ≈ RGCN ≈ GCN |
+| Metric | MLP | GCN | GAT | **RGCN** | **HGT** 🏆 | Ordering |
+|--------|-----|-----|-----|----------|----------|----------|
+| Test Disp R² | 0.8554 | 0.8476 | 0.8421 | 0.9366 | **0.9769** | **HGT > RGCN > MLP > GCN > GAT** |
+| Test Force R² | 0.9824 | 0.9696 | 0.9632 | 0.9878 | **0.9891** | **HGT > RGCN > MLP > GCN > GAT** |
+| Combined RelMAE | 0.0884 | 0.1227 | 0.1361 | 0.0724 | **0.0683** | **HGT > RGCN > MLP > GCN > GAT** |
+| Params | 96,274 | 76,050 | 76,818 | 520,338 | 744,279 | — |
+| Train Time | **56.9min** | 114.9min | 128.1min | 135.7min | 353.1min | — |
 
-**RGCN dominates across ALL metrics. MLP > GCN > GAT monotonicity now re-contextualised: the gap was caused by edge-type confusion, not by graph vs non-graph architecture.**
+**Final baseline ranking: HGT > RGCN > MLP > GCN > GAT on every single metric.**
 
 ### 4.2 Displacement Per-Component R²
 
-| Component | MLP | GCN | GAT | **RGCN** | RGCN-Δ vs MLP |
-|-----------|-----|-----|-----|----------|---------------|
-| Dx | 0.9912 | 0.9829 | 0.9825 | **0.9902** | -0.0010 |
-| Dy | **0.1833** | 0.1778 | 0.1649 | **0.6692** | **+0.4859** 🎯 |
-| Dz | 0.9918 | 0.9832 | 0.9820 | **0.9907** | -0.0011 |
-| Rx | 0.9931 | 0.9855 | 0.9845 | **0.9919** | -0.0012 |
-| Ry | 0.9882 | 0.9817 | 0.9675 | **0.9924** | +0.0042 |
-| Rz | 0.9850 | 0.9746 | 0.9714 | **0.9854** | +0.0004 |
+| Component | MLP | GCN | GAT | **RGCN** | **HGT** 🏆 | HGT-Δ vs RGCN |
+|-----------|:---:|:---:|:---:|:--------:|:----------:|:-------------:|
+| Dx | 0.9912 | 0.9829 | 0.9825 | 0.9902 | **0.9896** | -0.0006 |
+| **Dy** 🎯 | **0.1833** | **0.1778** | **0.1649** | **0.6692** | **0.9077** | **+0.2385** |
+| Dz | 0.9918 | 0.9832 | 0.9820 | 0.9907 | **0.9906** | -0.0001 |
+| Rx | 0.9931 | 0.9855 | 0.9845 | 0.9919 | **0.9935** 🏆 | +0.0016 |
+| Ry | 0.9882 | 0.9817 | 0.9675 | 0.9924 | **0.9925** 🏆 | +0.0001 |
+| Rz | 0.9850 | 0.9746 | 0.9714 | 0.9854 | **0.9875** 🏆 | +0.0021 |
 
-**Dy breakthrough:** RGCN improves Dy R² from ~0.18 to **0.6692** — a +0.486 gain over MLP. This confirms the Stage 2-A hypothesis: Dy was data-limited, and typed message passing unlocks the lateral displacement signal.
+**Dy breakthrough trajectory: 0.18 (Stage 2-A) → 0.67 (RGCN) → 0.91 (HGT).** The bottleneck is essentially eliminated by typed attention.
 
 ### 4.3 Force Per-Component R²
 
-| Component | MLP | GCN | GAT | **RGCN** |
-|-----------|-----|-----|-----|----------|
-| Fx_I/J | 0.9935 | 0.9793 | 0.9761 | **0.9952** |
-| Fy_I/J | 0.9832 | 0.9686 | 0.9623 | **0.9858** |
-| Fz_I/J | 0.9673 | 0.9680 | 0.9565 | **0.9848** |
-| Mx_I/J | 0.9879 | 0.9763 | 0.9753 | **0.9885** |
-| My_I/J | 0.9744 | 0.9632 | 0.9545 | **0.9858** (avg) |
-| Mz_I/J | 0.9883 | 0.9623 | 0.9546 | **0.9868** (avg) |
+| Component | MLP | GCN | GAT | **RGCN** | **HGT** 🏆 |
+|-----------|:---:|:---:|:---:|:--------:|:----------:|
+| Fx_I/J | 0.9935 | 0.9793 | 0.9761 | 0.9952 | **0.9958** 🏆 |
+| Fy_I/J | 0.9832 | 0.9686 | 0.9623 | 0.9858 | **0.9866** 🏆 |
+| Fz_I/J | 0.9673 | 0.9680 | 0.9565 | 0.9848 | **0.9879** 🏆 |
+| Mx_I/J | 0.9879 | 0.9763 | 0.9753 | 0.9885 | **0.9894** 🏆 |
+| My_I/J | 0.9744 | 0.9632 | 0.9545 | 0.9858 | **0.9874** 🏆 |
+| Mz_I/J | 0.9883 | 0.9623 | 0.9546 | 0.9868 | **0.9877** 🏆 |
 
-All 12 force components ≥ 0.9848 — the worst force component (Fz) in RGCN matches the best force components of GCN/GAT.
+All 12 force components ≥ 0.9866 — HGT improves every single force component over RGCN.
 
 ---
 
@@ -185,15 +186,24 @@ RGCN's breakthrough results reshape the research trajectory:
 ### Updated recovery trajectory
 
 ```
-MLP  (0.8554/0.9824)  ← surpassed by RGCN
+MLP  (0.8554/0.9824)  ← surpassed
 GCN  (0.8476/0.9696)  ← surpassed
 GAT  (0.8421/0.9632)  ← surpassed
-RGCN (0.9366/0.9878)  ← ✓ typed message passing confirmed
-HGT  (???)            ← typed attention, potential further improvement
+RGCN (0.9366/0.9878)  ← ✓ typed convolution confirmed
+HGT  (0.9769/0.9891)  ← ✓ typed attention confirmed — current best baseline
 Ours (???)            ← physics-gated + multi-scale, expected best
 ```
 
-**RGCN has validated the core thesis**: heterogeneous graph structure with type-aware message passing is the correct approach for steel truss girder surrogate modelling.
+**Stage 2-B has fully validated the core thesis**: heterogeneous graph structure with type-aware message passing (especially typed attention) is the correct approach for steel truss girder surrogate modelling.
+
+### Stage 2-B complete — recommendation
+
+| Stage | Status | Next |
+|-------|--------|------|
+| Stage 2-A (MLP, GCN, GAT) | ✅ Complete | — |
+| Stage 2-B (RGCN, HGT) | ✅ **Complete** | Enter **Stage 3 (Ours-base)** |
+
+HGT (Disp R²=0.9769, Force R²=0.9891) serves as the strong baseline for Ours. The key question for Stage 3 is whether physics-gated message passing can further improve upon HGT's typed attention — especially in Dy, regional errors, and physical consistency.
 
 ---
 
@@ -215,36 +225,32 @@ Ours (???)            ← physics-gated + multi-scale, expected best
 
 ## Stage 2-B Extension
 
-### Status: ✅ RGCN completed — next: HGT
+### Status: ✅ Stage 2-B typed baselines completed — 5 models in total (MeshGraphNet-style optional)
 
-| Method | Graph Type | Typed Message | Multi-scale | Physics Loss | Params | **Disp R²** | **Force R²** | **RelMAE** | Status |
-|--------|-----------|---------------|-------------|--------------|-------:|-----------:|------------:|----------:|--------|
-| RGCN | heterogeneous | **relation-specific (SAGEConv)** | no | no | 520,338 | **0.9366** | **0.9878** | **0.0724** | ✅ completed |
+| Method | Graph Type | Typed Message | Edge Attr Aware | Params | **Disp R²** | **Force R²** | **RelMAE** | Status |
+|--------|-----------|---------------|----------------|-------:|-----------:|------------:|----------:|--------|
+| MLP | none | no | no | 96,274 | 0.8554 | 0.9824 | 0.0884 | ✅ completed |
+| GCN | homogeneous | no | no | 76,050 | 0.8476 | 0.9696 | 0.1227 | ✅ completed |
+| GAT | homogeneous | no | no | 76,818 | 0.8421 | 0.9632 | 0.1361 | ✅ completed |
+| RGCN | heterogeneous | relation-specific (SAGEConv) | no | 520,338 | 0.9366 | 0.9878 | 0.0724 | ✅ completed |
+| **HGT** 🏆 | **heterogeneous** | **typed attention (HGTConv)** | **no** | **744,279** | **0.9769** | **0.9891** | **0.0683** | ✅ **completed** |
 
-### RGCN Result Summary
+**Final ranking: HGT > RGCN > MLP > GCN > GAT**
 
-**All success criteria met:**
-| Criterion | Target | Actual | Outcome |
-|-----------|--------|--------|---------|
-| RGCN Disp R² > GCN (0.8476) | ✅ | **0.9366** | **+0.0890** 🏆 |
-| RGCN Force R² > GCN (0.9696) | ✅ | **0.9878** | **+0.0182** 🏆 |
-| RGCN Disp R² > MLP (0.8554) | 🎯 | **0.9366** | **+0.0812** 🏆 |
-| RGCN Force R² > MLP (0.9824) | 🎯 | **0.9878** | **+0.0054** 🏆 |
-| RGCN RelMAE < GCN (0.1227) | ✅ | **0.0724** | **-0.0503** 🏆 |
-| Dy improvement | 🔍 | 0.1833→**0.6692** | **+0.4859** 🎯 |
-| All force ≥ 0.98 | ✅ | Min force R² = 0.9848 | ✅ |
+### Summary
 
-### Key discovery
+| Discovery | Detail |
+|-----------|--------|
+| RGCN | Typed convolution beats homogeneous + MLP. Dy: 0.18 → 0.67. |
+| **HGT** 🏆 | **Typed attention beats typed convolution. Dy: 0.67 → 0.91. Force: 0.9878 → 0.9891.** |
 
-The Stage 2-A Dy bottleneck (R²≈0.18 across all homogeneous models) was **not a data limitation** — it was a **model limitation**. RGCN's per-edge-type SAGEConv on `structural_link` edges unlocks lateral displacement prediction, improving Dy R² by +0.49.
+### Stage 2-B Conclusion
 
-### Model: HeteroRGCNBaseline
+**Typed baselines objectives met:**
+1. ✅ Typed message passing > homogeneous message passing (RGCN > GCN/GAT)
+2. ✅ Typed attention > typed convolution (HGT > RGCN)
+3. ✅ Dy was model-limited, not data-limited (0.18 → 0.67 → 0.91)
+4. ✅ Clear innovation chain: GCN/GAT < MLP < RGCN < HGT
 
-- **Input:** Type-specific Linear projections (mesh_node 15, beam_element 11, plate_element 6 → 128)
-- **Message passing:** 3× `HeteroConv` with per-edge-type `SAGEConv` on all 5 canonical edge types
-- **LayerNorm:** Per-node-type LayerNorm after each layer
-- **Decoders:** Same `MLPHead` decoders as Stage 2-A
-- **Artifact verified:** 13 files, 11765 KB, no OOM/Traceback, exit code 0
-
-See `docs/stage2b_baseline_plan.md` for full Stage 2-B plan.
+**Recommendation: Enter Stage 3 (Ours-base).**
 

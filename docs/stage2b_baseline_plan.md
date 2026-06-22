@@ -155,11 +155,19 @@ The Dy bottleneck (R²≈0.18 across all homogeneous models) was broken by RGCN 
 
 | Step | Model | Status |
 |------|-------|--------|
-| 1 | **RGCN (HeteroConv + SAGEConv)** | ✅ **Done — Disp R² 0.9366, Force R² 0.9878** |
-| 2 | **HGT (typed attention)** | 🏗️ **Implemented, running-ready** |
-| 3 | MeshGraphNet-style baseline | Pending |
+| 1 | **RGCN (HeteroConv + SAGEConv)** | ✅ **Disp R² 0.9366, Force R² 0.9878** |
+| 2 | **HGT (typed attention, HGTConv)** | ✅ **Disp R² 0.9769, Force R² 0.9891** |
+| 3 | MeshGraphNet-style baseline | 💤 Optional — not critical to research thesis |
 
-**Recommendation:** After HGT results are in, the Stage 2-B comparison will be complete. Key question: typed attention (HGT) vs typed convolution (RGCN).
+**Recommendation:** Stage 2-B typed baselines (RGCN, HGT) completed. Enter **Stage 3 (Ours-base)** next. MeshGraphNet-style processor remains optional. The comparison chain is now fully established:
+
+```
+Homogeneous (GCN/GAT) < Non-graph (MLP) < Typed Conv (RGCN) < Typed Attn (HGT)
+```
+
+Ours-base should build on HGT's typed attention foundation while introducing physics-gated message passing as the key innovation over standard HGT.
+
+Note: MeshGraphNet-style processor is less critical because the core research questions have been answered by the RGCN → HGT progression. Consider it only if needed for the MeshGraphNet citation in related work.
 
 ## 11. If RGCN Still Underperforms
 
