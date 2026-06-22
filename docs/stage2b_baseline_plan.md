@@ -1,6 +1,6 @@
 # Stage 2-B Baseline Plan — Typed Message Passing Baselines
 
-> **Status:** 🏗️ In progress  
+> **Status:** ✅ **RGCN completed** — next: HGT  
 > **Dataset:** `processed/hetero_graph_dataset_v2`  
 > **Split:** `by_sample` (train=28,000 / val=3,500 / test=3,500)  
 > **Last updated:** 2026-06-21
@@ -123,13 +123,43 @@ MLP  (0.8554, 0.9824)  ← non-graph upper bound
 
 If RGCN beats MLP on force R² (which MLP already gets at 0.9824), then typed message passing is essential for this task. If it does not, the hypothesis needs refinement.
 
-## 10. Next Steps
+## 10. RGCN Results (2026-06-21)
+
+### 10.1 Summary
+
+| Metric | MLP | GCN | GAT | **RGCN** | RGCN Δ vs MLP |
+|--------|-----|-----|-----|----------|---------------|
+| Test Disp R² | 0.8554 | 0.8476 | 0.8421 | **0.9366** | **+0.0812** |
+| Test Force R² | 0.9824 | 0.9696 | 0.9632 | **0.9878** | **+0.0054** |
+| Combined RelMAE | 0.0884 | 0.1227 | 0.1361 | **0.0724** | **-0.0160** |
+
+### 10.2 Success criteria assessment
+
+| Criterion | Target | Actual | Outcome |
+|-----------|--------|--------|---------|
+| RGCN Disp R² > GCN (0.8476) | ✅ | 0.9366 | **+0.0890** ✅ |
+| RGCN Force R² > GCN (0.9696) | ✅ | 0.9878 | **+0.0182** ✅ |
+| RGCN Disp R² > MLP (0.8554) | 🎯 | 0.9366 | **+0.0812** ✅ |
+| RGCN Force R² > MLP (0.9824) | 🎯 | 0.9878 | **+0.0054** ✅ |
+| RGCN RelMAE < GCN (0.1227) | ✅ | 0.0724 | **-0.0503** ✅ |
+| Dy component improved | 🔍 | 0.18 → **0.67** | **+0.49** ✅ |
+| Force R² stays > 0.97 | ✅ | **0.9878** | ✅ |
+
+All criteria met. Hypothesis confirmed: **typed message passing fully recovers and exceeds the Stage 2-A homogeneous performance gap.**
+
+### 10.3 Key finding
+
+The Dy bottleneck (R²≈0.18 across all homogeneous models) was broken by RGCN (R²=0.67). This proves it was a **model limitation, not a data limitation**. `structural_link` edges carrying lateral stiffness information require type-aware processing to be useful.
+
+## 11. Next Steps
 
 | Step | Model | Status |
 |------|-------|--------|
-| 1 | RGCN (HeteroConv + SAGEConv) | ✅ Implemented, job created |
-| 2 | HGT / HAN-style hetero attention | Pending |
+| 1 | **RGCN (HeteroConv + SAGEConv)** | ✅ **Done — Disp R² 0.9366, Force R² 0.9878** |
+| 2 | **HGT (typed attention)** | 🏗️ **Implemented, running-ready** |
 | 3 | MeshGraphNet-style baseline | Pending |
+
+**Recommendation:** After HGT results are in, the Stage 2-B comparison will be complete. Key question: typed attention (HGT) vs typed convolution (RGCN).
 
 ## 11. If RGCN Still Underperforms
 

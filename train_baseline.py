@@ -8,6 +8,7 @@ Supports:
   - ``gcn``          — HomogeneousGCN
   - ``gat``          — HomogeneousGAT
   - ``rgcn``         — HeteroRGCNBaseline (relation-specific typed message passing)
+  - ``hgt``          — HGTBaseline (typed attention, HGTConv)
 
 All models use ``processed/hetero_graph_dataset_v2`` and the
 ``HeteroFeatureScaler`` for standardisation.
@@ -57,6 +58,7 @@ from src.models.baselines import (
     HomogeneousGCN,
     HomogeneousGAT,
     HeteroRGCNBaseline,
+    HGTBaseline,
 )
 from src.trainers.baseline_trainer import BaselineTrainer
 from src.utils.experiment import create_experiment_dir, save_resolved_config
@@ -78,6 +80,7 @@ MODEL_NAMES_MAP = {
     "gcn": "HomogeneousGCN",
     "gat": "HomogeneousGAT",
     "rgcn": "HeteroRGCNBaseline",
+    "hgt": "HGTBaseline",
 }
 
 MODEL_CONFIG_KEYS = {
@@ -85,6 +88,7 @@ MODEL_CONFIG_KEYS = {
     "gcn": "homogeneous_gcn",
     "gat": "homogeneous_gat",
     "rgcn": "hetero_rgcn",
+    "hgt": "hgt",
 }
 
 
@@ -163,6 +167,19 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
             hidden_dim=model_cfg.get("hidden_dim", 128),
             num_layers=model_cfg.get("num_layers", 3),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+        )
+    elif model_name == "hgt":
+        model = HGTBaseline(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 3),
+            heads=model_cfg.get("heads", 4),
             dropout=model_cfg.get("dropout", 0.1),
             activation=model_cfg.get("activation", "relu"),
             use_layer_norm=model_cfg.get("use_layer_norm", True),
@@ -678,6 +695,14 @@ def _get_input_construction_desc(model_name: str, model_cfg: Dict) -> str:
             "on all 5 edge types independently. Per-node-type LayerNorm. "
             "MLPHead decoders for disp (6) and force (12). "
             "No edge_attr used — this is a standard typed-relation baseline."
+        )
+    elif model_name == "hgt":
+        return (
+            "HGTBaseline: Type-specific Linear projections per node type "
+            "(mesh_node 15-dim, beam_element 11-dim, plate_element 6-dim) to shared "
+            "hidden_dim. Typed attention via HGTConv (4 heads) on all 5 edge types. "
+            "Per-node-type LayerNorm. MLPHead decoders for disp (6) and force (12). "
+            "No edge_attr used — this is a standard typed-attention baseline."
         )
     return ""
 

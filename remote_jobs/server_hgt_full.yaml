@@ -1,0 +1,53 @@
+# =============================================================================
+# server_hgt_full.yaml — Full HGT typed-attention baseline training
+#
+# Purpose:
+#   Train HGTBaseline on the full hetero_graph_dataset_v2.
+#   Stage 2-B: typed attention baseline (HGTConv).
+#
+# Notes:
+#   - Uses HGTConv with typed multi-head attention (4 heads, hidden_dim=128).
+#   - HGT distinguishes edge types in both attention computation and message
+#     construction via type-dependent QKV projections.
+#   - This is the SECOND typed-relation baseline (after RGCN), testing whether
+#     typed ATTENTION outperforms typed CONVOLUTION.
+#   - No edge_attr, no physics gating, no macro graph — pure typed attention.
+#   - batch_size=8 is recommended default. HGT with 4 heads has higher memory
+#     footprint than RGCN. If OOM on 8× RTX 4090, reduce to 4.
+#     If memory permits, batch_size=16 can be tried but 8 is safer for first run.
+#   - Expected runtime: ~4-8 hours on 8× RTX 4090.
+#
+# Reference:
+#   - HGT: Hu et al., WWW 2020. "Heterogeneous Graph Transformer."
+#     https://arxiv.org/abs/2003.01332
+#   - PyG HGTConv: https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.HGTConv.html
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_hgt_full.yaml
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "hgt"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training (full — all graphs, 100 epochs)
+epochs: 100
+batch_size: 8
+# max_graphs omitted = use all graphs
+
+# Naming
+run_name: "server_hgt_full"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true

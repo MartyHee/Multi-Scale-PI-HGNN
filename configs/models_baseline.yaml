@@ -49,3 +49,15 @@ hetero_rgcn:
   activation: "relu"
   use_layer_norm: true
   decoder_hidden_dims: [64, 32]
+
+hgt:
+  mesh_feat_dim: 15
+  beam_feat_dim: 11
+  plate_feat_dim: 6
+  hidden_dim: 128
+  num_layers: 3
+  heads: 4
+  dropout: 0.1
+  activation: "relu"
+  use_layer_norm: true
+  decoder_hidden_dims: [64, 32]
