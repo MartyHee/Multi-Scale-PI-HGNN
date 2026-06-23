@@ -61,6 +61,7 @@ from src.models.baselines import (
     HeteroRGCNBaseline,
     HGTBaseline,
     OursBaseline,
+    OursBaselineV2,
 )
 from src.trainers.baseline_trainer import BaselineTrainer
 from src.utils.experiment import create_experiment_dir, save_resolved_config
@@ -84,6 +85,7 @@ MODEL_NAMES_MAP = {
     "rgcn": "HeteroRGCNBaseline",
     "hgt": "HGTBaseline",
     "ours_base": "OursBaseline",
+    "ours_base_v2": "OursBaselineV2",
 }
 
 MODEL_CONFIG_KEYS = {
@@ -93,6 +95,7 @@ MODEL_CONFIG_KEYS = {
     "rgcn": "hetero_rgcn",
     "hgt": "hgt",
     "ours_base": "ours_base",
+    "ours_base_v2": "ours_base_v2",
 }
 
 
@@ -202,6 +205,23 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
             structural_edge_dim=model_cfg.get("structural_edge_dim", 10),
             edge_hidden_dim=model_cfg.get("edge_hidden_dim", 32),
+        )
+    elif model_name == "ours_base_v2":
+        model = OursBaselineV2(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 3),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+            structural_edge_dim=model_cfg.get("structural_edge_dim", 10),
+            edge_hidden_dim=model_cfg.get("edge_hidden_dim", 32),
+            gate_scale=model_cfg.get("gate_scale", 0.1),
+            use_edge_bias=model_cfg.get("use_edge_bias", False),
+            edge_bias_scale=model_cfg.get("edge_bias_scale", 0.0),
         )
     else:
         raise ValueError(f"Unknown model '{model_name}'. Options: {list(MODEL_NAMES_MAP.keys())}")
@@ -730,6 +750,18 @@ def _get_input_construction_desc(model_name: str, model_cfg: Dict) -> str:
             "Structural_link edge uses StructuralLinkConv with edge_attr encoding "
             "(10-dim stiffness features) and physics gate (sigmoid(MLP(edge_attr))). "
             "Sum aggregation per node type, activation + dropout + LayerNorm. "
+            "Shared dual decoder: MLPHead for disp (6) and force (12). "
+            "No macro anchor, no physics loss, no UQ — Stage 3 boundary."
+        )
+    elif model_name == "ours_base_v2":
+        return (
+            "OursBaselineV2 (EA-HGNN v2): Type-specific Linear projections per node type "
+            "(mesh_node 15-dim, beam_element 11-dim, plate_element 6-dim) to shared "
+            "hidden_dim. Membership edges (4 types) use SAGEConv (relation-specific). "
+            "Structural_link edge uses StructuralLinkConvV2 with residual gate "
+            "(1 + scale*tanh(MLP(edge_attr))), root/self path (lin_root), "
+            "and edge bias OFF by default. Sum aggregation per node type, "
+            "activation + dropout + LayerNorm. "
             "Shared dual decoder: MLPHead for disp (6) and force (12). "
             "No macro anchor, no physics loss, no UQ — Stage 3 boundary."
         )

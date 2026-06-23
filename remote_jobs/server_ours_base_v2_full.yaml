@@ -1,0 +1,50 @@
+# =============================================================================
+# server_ours_base_v2_full.yaml — Full Ours-base v2 (EA-HGNN v2) training
+#
+# Purpose:
+#   Train OursBaselineV2 (EA-HGNN v2) on the full hetero_graph_dataset_v2.
+#   Stage 3 debug iteration: fixes StructuralLinkConv issues from v1.
+#
+# Key improvements over v1:
+#   - StructuralLinkConvV2 with root/self path (lin_root) — provides stable
+#     self-connection missing in v1, matching SAGEConv behavior.
+#   - Residual gate: 1 + scale * tanh(MLP(edge_attr)), gate_scale=0.1,
+#     so gate ≈ 1.0 at initialization (no initial suppression).
+#   - Edge bias OFF by default (use_edge_bias: false) — avoids uniform
+#     additive bias that hurt displacement in v1.
+#   - Gate diagnostics available via model.get_gate_stats().
+#
+# Architecture reference:
+#   - OursBaseLayerV2: 4× SAGEConv (membership) + 1× StructuralLinkConvV2
+#   - StructuralLinkConvV2: root path + residual gate
+#   - Dual decoder: shared MLPHead for disp (6) and force (12)
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_ours_base_v2_full.yaml
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "ours_base_v2"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training (full — all graphs, 100 epochs)
+epochs: 100
+batch_size: 8
+# max_graphs omitted = use all graphs
+
+# Naming
+run_name: "server_ours_base_v2_full"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true

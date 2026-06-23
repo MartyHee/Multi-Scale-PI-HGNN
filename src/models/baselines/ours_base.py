@@ -501,3 +501,448 @@ class OursBaseline(nn.Module):
 # ============================================================
 
 OursBase = OursBaseline
+
+
+# ============================================================
+# StructuralLinkConvV2 — edge-conditioned gate + root path
+# ============================================================
+
+class StructuralLinkConvV2(MessagePassing):
+    """Edge-conditioned message passing for structural_link edges (v2).
+
+    Key improvements over v1 (StructuralLinkConv):
+
+      1. **Root/self path**: ``lin_root(x_dst)`` added to aggregated output,
+         providing a stable self-connection (matching SAGEConv behavior).
+      2. **Gate-only modulation**: ``gate = 1 + gate_scale * tanh(MLP(edge_attr))``,
+         with ``gate_scale=0.1`` default. At init, gate ≈ 1.0 so the message
+         starts close to plain SAGEConv and learns edge-specific modulation.
+      3. **Edge bias default OFF**: ``use_edge_bias=False``. The optional
+         ``edge_encoder`` additive path is disabled by default to avoid
+         strong uniform bias when all links are RIGID.
+      4. **Diagnostics**: ``get_gate_stats()`` returns per-forward-pass gate
+         statistics without affecting training.
+
+    Message::
+
+        msg = gate * W_src(h_src)             # if use_edge_bias=False  (default)
+        msg = gate * W_src(h_src) + edge_scale * W_edge(edge_attr)   # if use_edge_bias=True
+
+    Output::
+
+        out = W_root(x_dst) + mean_aggr(messages)
+
+    Args:
+        in_channels: Input feature dim for mesh_node.
+        out_channels: Output feature dim.
+        edge_dim: Structural link edge attribute dimension (default: 10).
+        edge_hidden: Hidden dim for gate network (default: 32).
+        gate_scale: Scale for the tanh residual gate (default: 0.1).
+        use_edge_bias: Whether to include additive edge encoding (default: False).
+        edge_bias_scale: Scale for edge bias when enabled (default: 0.0).
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        edge_dim: int = 10,
+        edge_hidden: int = 32,
+        gate_scale: float = 0.1,
+        use_edge_bias: bool = False,
+        edge_bias_scale: float = 0.0,
+    ):
+        super().__init__(aggr="mean")
+        self.lin_src = nn.Linear(in_channels, out_channels, bias=False)
+        self.lin_root = nn.Linear(in_channels, out_channels, bias=True)
+        self.gate_scale = gate_scale
+        self.use_edge_bias = use_edge_bias
+        self.edge_bias_scale = edge_bias_scale
+
+        # Gate network: edge_attr → 1-d modulation
+        self.gate_net = nn.Sequential(
+            nn.Linear(edge_dim, edge_hidden),
+            nn.ReLU(),
+            nn.Linear(edge_hidden, 1),
+        )
+
+        # Optional edge bias (default OFF)
+        if use_edge_bias:
+            self.edge_encoder = nn.Sequential(
+                nn.Linear(edge_dim, edge_hidden),
+                nn.ReLU(),
+                nn.Linear(edge_hidden, out_channels),
+            )
+
+        # Diagnostic storage (reset each forward)
+        self._reset_diagnostics()
+
+    def _reset_diagnostics(self) -> None:
+        self._last_gate: Optional[torch.Tensor] = None
+        self._last_node_msg_norm: Optional[torch.Tensor] = None
+        self._last_edge_enc_norm: Optional[torch.Tensor] = None
+        self._last_root_norm: Optional[torch.Tensor] = None
+        self._last_aggr_norm: Optional[torch.Tensor] = None
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        edge_index: torch.Tensor,
+        edge_attr: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: ``mesh_node`` features ``(N, in_channels)``.
+            edge_index: Structural link edge indices ``(2, E)``.
+            edge_attr: Edge attributes ``(E, edge_dim)`` or ``None``.
+
+        Returns:
+            ``(N, out_channels)`` = root_path + aggregated messages.
+        """
+        self._reset_diagnostics()
+
+        # Root/self path (always present)
+        root = self.lin_root(x)  # (N, out_channels)
+        self._last_root_norm = root.detach().norm(dim=1)
+
+        # Aggregate edge-conditioned neighbor messages
+        if edge_attr is not None:
+            aggr = self.propagate(edge_index, x=(x, x), edge_attr=edge_attr)
+        else:
+            aggr = self.propagate(edge_index, x=(x, x), edge_attr=None)
+
+        self._last_aggr_norm = aggr.detach().norm(dim=1)
+
+        return root + aggr
+
+    def message(
+        self,
+        x_j: torch.Tensor,
+        edge_attr: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Compute edge-conditioned messages.
+
+        Args:
+            x_j: Source node features ``(E, in_channels)``.
+            edge_attr: Edge attributes ``(E, edge_dim)`` or ``None``.
+
+        Returns:
+            ``(E, out_channels)`` messages.
+        """
+        node_msg = self.lin_src(x_j)  # (E, out_channels)
+
+        if edge_attr is None:
+            # Fallback: bare source message (identical to SAGEConv neighbor msg)
+            self._last_node_msg_norm = node_msg.detach().norm(dim=1)
+            return node_msg
+
+        # Residual gate: gate ≈ 1.0 at init
+        gate_raw = self.gate_net(edge_attr)  # (E, 1)
+        gate = 1.0 + self.gate_scale * torch.tanh(gate_raw)  # (E, 1)
+
+        msg = gate * node_msg  # (E, out_channels)
+
+        # Optional edge bias (default OFF)
+        if self.use_edge_bias and hasattr(self, "edge_encoder"):
+            edge_enc = self.edge_encoder(edge_attr)  # (E, out_channels)
+            msg = msg + self.edge_bias_scale * edge_enc
+            self._last_edge_enc_norm = edge_enc.detach().norm(dim=1)
+
+        # Store diagnostics
+        self._last_gate = gate.detach()
+        self._last_node_msg_norm = node_msg.detach().norm(dim=1)
+
+        return msg
+
+    def get_gate_stats(self) -> Optional[Dict[str, float]]:
+        """Return diagnostic stats from the most recent forward pass.
+
+        Returns:
+            Dict with gate_mean, gate_std, gate_min, gate_max,
+            node_msg_norm_mean, root_norm_mean, aggr_norm_mean,
+            and edge_enc_norm_mean (if use_edge_bias=True).
+            Returns ``None`` if no forward pass has been run.
+        """
+        if self._last_gate is None:
+            return None
+        g = self._last_gate
+        stats: Dict[str, float] = {
+            "gate_mean": g.mean().item(),
+            "gate_std": g.std().item(),
+            "gate_min": g.min().item(),
+            "gate_max": g.max().item(),
+        }
+        if self._last_node_msg_norm is not None:
+            stats["node_msg_norm_mean"] = self._last_node_msg_norm.mean().item()
+        if self._last_root_norm is not None:
+            stats["root_norm_mean"] = self._last_root_norm.mean().item()
+        if self._last_aggr_norm is not None:
+            stats["aggr_norm_mean"] = self._last_aggr_norm.mean().item()
+        if self._last_edge_enc_norm is not None:
+            stats["edge_enc_norm_mean"] = self._last_edge_enc_norm.mean().item()
+        return stats
+
+
+# ============================================================
+# OursBaseLayerV2 — one message-passing layer (v2)
+# ============================================================
+
+class OursBaseLayerV2(nn.Module):
+    """One EA-HGNN typed message-passing layer (v2).
+
+    Same structure as OursBaseLayer, but uses StructuralLinkConvV2
+    (root path + residual gate, no default edge bias) instead of
+    StructuralLinkConv (additive edge encoding).
+
+    Membership edges (4 types): SAGEConv (relation-specific, same as RGCN).
+    StructuralLink edge (1 type): StructuralLinkConvV2 (residual gate).
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int = 128,
+        structural_edge_dim: int = 10,
+        edge_hidden: int = 32,
+        dropout: float = 0.1,
+        activation: str = "relu",
+        gate_scale: float = 0.1,
+        use_edge_bias: bool = False,
+        edge_bias_scale: float = 0.0,
+    ):
+        super().__init__()
+        self.dropout = dropout
+        act_map = {
+            "relu": nn.ReLU(),
+            "gelu": nn.GELU(),
+            "elu": nn.ELU(),
+            "leaky_relu": nn.LeakyReLU(0.1),
+        }
+        self.activation_fn = act_map.get(activation, nn.ReLU())
+
+        # Membership edge convs (SAGEConv per type, same as RGCN/v1)
+        self.member_convs = nn.ModuleDict()
+        for et in MEMBER_EDGE_TYPES:
+            self.member_convs[_et_key(et)] = SAGEConv(hidden_dim, hidden_dim)
+
+        # Structural link conv (v2: root path + residual gate)
+        self.structural_conv = StructuralLinkConvV2(
+            hidden_dim, hidden_dim,
+            edge_dim=structural_edge_dim,
+            edge_hidden=edge_hidden,
+            gate_scale=gate_scale,
+            use_edge_bias=use_edge_bias,
+            edge_bias_scale=edge_bias_scale,
+        )
+
+        # Per-node-type LayerNorm
+        self.norms = nn.ModuleDict({
+            nt: nn.LayerNorm(hidden_dim) for nt in NODE_TYPES
+        })
+
+    def forward(
+        self,
+        x_dict: Dict[str, torch.Tensor],
+        edge_index_dict: Dict[Tuple[str, str, str], torch.Tensor],
+        structural_edge_attr: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """Forward pass for one EA-HGNN v2 layer."""
+        # ---- 1. Membership edges: SAGEConv per type ----
+        member_out: Dict[str, List[torch.Tensor]] = {nt: [] for nt in NODE_TYPES}
+        for et in MEMBER_EDGE_TYPES:
+            conv = self.member_convs[_et_key(et)]
+            src, rel, dst = et
+            edge_index = edge_index_dict[et]
+            out = conv((x_dict[src], x_dict[dst]), edge_index)
+            member_out[dst].append(out)
+
+        # ---- 2. Sum membership contributions per node type ----
+        new_x: Dict[str, torch.Tensor] = {}
+        for nt in NODE_TYPES:
+            outs = member_out[nt]
+            if len(outs) == 0:
+                new_x[nt] = x_dict[nt]
+            else:
+                new_x[nt] = sum(outs)
+
+        # ---- 3. Structural link (v2: root path + residual gate) ----
+        sl_edge_index = edge_index_dict[STRUCTURAL_EDGE_TYPE]
+        sl_msg = self.structural_conv(
+            x_dict["mesh_node"], sl_edge_index, structural_edge_attr,
+        )
+        new_x["mesh_node"] = new_x["mesh_node"] + sl_msg
+
+        # ---- 4. Activation → dropout → LayerNorm per node type ----
+        for nt in NODE_TYPES:
+            h = self.activation_fn(new_x[nt])
+            h = F.dropout(h, p=self.dropout, training=self.training)
+            new_x[nt] = self.norms[nt](h)
+
+        return new_x
+
+    def get_gate_stats(self) -> Optional[Dict[str, float]]:
+        """Delegate to the structural_conv's get_gate_stats()."""
+        return self.structural_conv.get_gate_stats()
+
+
+# ============================================================
+# OursBaselineV2 — Full EA-HGNN model (v2)
+# ============================================================
+
+class OursBaselineV2(nn.Module):
+    """EA-HGNN v2: Edge-Attribute-Aware Heterogeneous GNN with v2 structural link.
+
+    Architecture (same skeleton as OursBaseline, key differences in
+    StructuralLinkConvV2):
+
+      1. **Per-type node encoders**: ``nn.Linear`` per node type.
+      2. **L typed message-passing layers (OursBaseLayerV2)**:
+         - Membership edges: SAGEConv (relation-specific, unchanged).
+         - StructuralLink edges: StructuralLinkConvV2 with:
+             * Root/self path (``lin_root``).
+             * Residual gate (``1 + scale * tanh(MLP(edge_attr))``).
+             * Edge bias OFF by default.
+      3. **Dual decoder**: MLPHead for disp (6) and force (12).
+      4. **Gate diagnostics**: ``get_gate_stats()`` returns per-layer stats.
+
+    NOT included (Stage 3 boundary):
+        - No macro anchor graph / cross-scale fusion (→ Stage 4).
+        - No physics loss / support BC loss (→ Stage 5).
+        - No UQ (→ Stage 6).
+
+    Args:
+        mesh_feat_dim: Input feature dim for mesh_node (default: 15).
+        beam_feat_dim: Input feature dim for beam_element (default: 11).
+        plate_feat_dim: Input feature dim for plate_element (default: 6).
+        hidden_dim: Shared hidden dimension (default: 128).
+        num_layers: Number of OursBaseLayerV2 blocks (default: 3).
+        dropout: Dropout rate (default: 0.1).
+        activation: Activation name.
+        use_layer_norm: Whether to apply LayerNorm (default: True).
+        decoder_hidden_dims: Hidden dims for decoder MLP heads (default: [64, 32]).
+        structural_edge_dim: Dimension of structural_link edge_attr (default: 10).
+        edge_hidden_dim: Hidden dim for gate net in StructuralLinkConvV2 (default: 32).
+        gate_scale: Scale for tanh residual gate (default: 0.1).
+        use_edge_bias: Whether to include additive edge encoding (default: False).
+        edge_bias_scale: Scale for edge bias when enabled (default: 0.0).
+    """
+
+    def __init__(
+        self,
+        mesh_feat_dim: int = 15,
+        beam_feat_dim: int = 11,
+        plate_feat_dim: int = 6,
+        hidden_dim: int = 128,
+        num_layers: int = 3,
+        dropout: float = 0.1,
+        activation: str = "relu",
+        use_layer_norm: bool = True,
+        decoder_hidden_dims: Optional[List[int]] = None,
+        structural_edge_dim: int = 10,
+        edge_hidden_dim: int = 32,
+        gate_scale: float = 0.1,
+        use_edge_bias: bool = False,
+        edge_bias_scale: float = 0.0,
+    ):
+        super().__init__()
+        if decoder_hidden_dims is None:
+            decoder_hidden_dims = [64, 32]
+
+        self.hidden_dim = hidden_dim
+        self.dropout = dropout
+        self.num_layers = num_layers
+        self.use_layer_norm = use_layer_norm
+        self.structural_edge_dim = structural_edge_dim
+        self.gate_scale = gate_scale
+        self.use_edge_bias = use_edge_bias
+        self.edge_bias_scale = edge_bias_scale
+
+        # Type-specific input projections (same as OursBaseline v1)
+        self.mesh_encoder = nn.Linear(mesh_feat_dim, hidden_dim)
+        self.beam_encoder = nn.Linear(beam_feat_dim, hidden_dim)
+        self.plate_encoder = nn.Linear(plate_feat_dim, hidden_dim)
+
+        # Message-passing layers (v2)
+        self.layers = nn.ModuleList()
+        for _ in range(num_layers):
+            self.layers.append(OursBaseLayerV2(
+                hidden_dim=hidden_dim,
+                structural_edge_dim=structural_edge_dim,
+                edge_hidden=edge_hidden_dim,
+                dropout=dropout,
+                activation=activation,
+                gate_scale=gate_scale,
+                use_edge_bias=use_edge_bias,
+                edge_bias_scale=edge_bias_scale,
+            ))
+
+        # Dual decoder (same as v1)
+        self.disp_decoder = MLPHead(
+            input_dim=hidden_dim,
+            output_dim=6,
+            hidden_dims=decoder_hidden_dims,
+            dropout=dropout,
+            activation=activation,
+            use_batch_norm=True,
+        )
+        self.force_decoder = MLPHead(
+            input_dim=hidden_dim,
+            output_dim=12,
+            hidden_dims=decoder_hidden_dims,
+            dropout=dropout,
+            activation=activation,
+            use_batch_norm=True,
+        )
+
+    def forward(self, batch) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass on a HeteroDataBatch.
+
+        Args:
+            batch: HeteroDataBatch with 3 node types and 5 edge types.
+
+        Returns:
+            ``(pred_disp, pred_force)`` tuple.
+        """
+        # ---- 1. Type-specific projections ----
+        x_dict: Dict[str, torch.Tensor] = {
+            "mesh_node": self.mesh_encoder(batch["mesh_node"].x),
+            "beam_element": self.beam_encoder(batch["beam_element"].x),
+            "plate_element": self.plate_encoder(batch["plate_element"].x),
+        }
+
+        # ---- 2. Build edge_index_dict ----
+        edge_index_dict: Dict[Tuple[str, str, str], torch.Tensor] = {}
+        for et in ALL_EDGE_TYPES:
+            edge_index_dict[et] = batch[et].edge_index
+
+        # ---- 3. Extract structural_link edge_attr ----
+        structural_edge_attr: Optional[torch.Tensor] = None
+        sl_edge_key = STRUCTURAL_EDGE_TYPE
+        if sl_edge_key in batch.edge_types and hasattr(batch[sl_edge_key], "edge_attr"):
+            structural_edge_attr = batch[sl_edge_key].edge_attr
+
+        # ---- 4. Message-passing layers ----
+        for layer in self.layers:
+            x_dict = layer(x_dict, edge_index_dict, structural_edge_attr)
+
+        # ---- 5. Dual decoder ----
+        pred_disp = self.disp_decoder(x_dict["mesh_node"])
+        pred_force = self.force_decoder(x_dict["beam_element"])
+
+        return pred_disp, pred_force
+
+    def get_gate_stats(self) -> List[Optional[Dict[str, float]]]:
+        """Return gate diagnostics from all layers.
+
+        Returns:
+            List of dicts (one per layer) with gate_mean, gate_std, etc.
+            Entries may be ``None`` if no forward pass has been run.
+        """
+        return [layer.get_gate_stats() for layer in self.layers]
+
+
+# ============================================================
+# Convenience alias
+# ============================================================
+
+OursBaseV2 = OursBaselineV2

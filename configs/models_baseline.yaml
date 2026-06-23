@@ -78,3 +78,23 @@ ours_base:
   decoder_hidden_dims: [64, 32]
   structural_edge_dim: 10
   edge_hidden_dim: 32
+
+# ============================================================
+# Stage 3: Ours-base v2 — EA-HGNN v2 (residual gate + root path)
+# ============================================================
+
+ours_base_v2:
+  mesh_feat_dim: 15
+  beam_feat_dim: 11
+  plate_feat_dim: 6
+  hidden_dim: 128
+  num_layers: 3
+  dropout: 0.1
+  activation: "relu"
+  use_layer_norm: true
+  decoder_hidden_dims: [64, 32]
+  structural_edge_dim: 10
+  edge_hidden_dim: 32
+  gate_scale: 0.1
+  use_edge_bias: false
+  edge_bias_scale: 0.0
