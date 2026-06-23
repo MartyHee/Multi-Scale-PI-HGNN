@@ -1,0 +1,52 @@
+# =============================================================================
+# server_ours_base_full.yaml — Full Ours-base (EA-HGNN) training
+#
+# Purpose:
+#   Train OursBaseline (EA-HGNN) on the full hetero_graph_dataset_v2.
+#   Stage 3: Edge-attribute-aware heterogeneous GNN with physics gate.
+#
+# Notes:
+#   - Membership edges (4 types): SAGEConv per relation (same as RGCN).
+#   - StructuralLink edge (1 type): StructuralLinkConv with edge_attr encoding
+#     (10-dim stiffness features) and physics gate (sigmoid(MLP(edge_attr))).
+#   - No macro anchor, no physics loss, no UQ — Stage 3 boundary.
+#   - batch_size=8 is recommended for first run. If memory permits, try 16.
+#     The model has ~5 conv modules (4 SAGEConv + 1 StructuralLinkConv) per
+#     layer, comparable to RGCN.
+#   - Expected runtime: ~3-6 hours on 8× RTX 4090.
+#
+# Architecture reference:
+#   - OursBaseLayer: 4× SAGEConv (membership) + 1× StructuralLinkConv
+#   - EdgeEncoder: MLP(10-dim edge_attr → 32 → hidden_dim)
+#   - PhysicsGate: sigmoid(MLP(10-dim edge_attr → 16 → 1))
+#   - Dual decoder: shared MLPHead for disp (6) and force (12)
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_ours_base_full.yaml
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "ours_base"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training (full — all graphs, 100 epochs)
+epochs: 100
+batch_size: 8
+# max_graphs omitted = use all graphs
+
+# Naming
+run_name: "server_ours_base_full"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true

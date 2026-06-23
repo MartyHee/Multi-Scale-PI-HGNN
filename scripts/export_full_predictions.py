@@ -1,5 +1,5 @@
 """
-export_full_predictions.py — Eval-only full test-set prediction export for Stage 2-B baselines.
+export_full_predictions.py — Eval-only full test-set prediction export for Stage 2-B baselines and Ours-base.
 
 Loads a trained model (best_model.pt) from a run_dir or extracted artifact, runs
 inference on the test split, and saves per-node-type predictions as compressed
@@ -60,6 +60,7 @@ from src.models.baselines import (
     HomogeneousGAT,
     HeteroRGCNBaseline,
     HGTBaseline,
+    OursBaseline,
 )
 from src.utils.metrics import compute_all_metrics
 
@@ -79,6 +80,7 @@ MODEL_NAMES_MAP = {
     "gat": "HomogeneousGAT",
     "rgcn": "HeteroRGCNBaseline",
     "hgt": "HGTBaseline",
+    "ours_base": "OursBaseline",
 }
 
 MODEL_CONFIG_KEYS = {
@@ -87,6 +89,7 @@ MODEL_CONFIG_KEYS = {
     "gat": "homogeneous_gat",
     "rgcn": "hetero_rgcn",
     "hgt": "hgt",
+    "ours_base": "ours_base",
 }
 
 # ---------------------------------------------------------------------------
@@ -190,6 +193,20 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             activation=model_cfg.get("activation", "relu"),
             use_layer_norm=model_cfg.get("use_layer_norm", True),
             decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+        )
+    elif model_name == "ours_base":
+        model = OursBaseline(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 3),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+            structural_edge_dim=model_cfg.get("structural_edge_dim", 10),
+            edge_hidden_dim=model_cfg.get("edge_hidden_dim", 32),
         )
     else:
         raise ValueError(f"Unknown model '{model_name}'. Options: {list(MODEL_NAMES_MAP.keys())}")
