@@ -1,0 +1,40 @@
+# =============================================================================
+# server_ms_hgt_additive.yaml — Stage 4 MS-HGT additive fusion (ablation)
+#
+# Purpose:
+#   Train MSHGTBaseline with additive cross-scale fusion instead of gated.
+#   Used for ablation: does the gating mechanism matter for macro effectiveness?
+#
+# Architecture:
+#   Same as server_ms_hgt_gated.yaml, but fusion_method="additive".
+#
+# This is ablation experiment #2 in plan v2.0.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_ms_hgt_additive.yaml
+# =============================================================================
+
+# Model key — uses dedicated config key ms_hgt_additive
+model: "ms_hgt_additive"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training
+epochs: 200
+batch_size: 8
+
+# Naming
+run_name: "server_ms_hgt_additive"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true

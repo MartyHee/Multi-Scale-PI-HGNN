@@ -95,6 +95,44 @@ ours_base_v2:
   decoder_hidden_dims: [64, 32]
   structural_edge_dim: 10
   edge_hidden_dim: 32
-  gate_scale: 0.1
-  use_edge_bias: false
-  edge_bias_scale: 0.0
+# ============================================================
+# Stage 4: MS-HGT — Multi-Scale HGT (macro anchor + cross-scale fusion)
+# ============================================================
+
+ms_hgt:
+  mesh_feat_dim: 15
+  beam_feat_dim: 11
+  plate_feat_dim: 6
+  hidden_dim: 128
+  num_layers: 3
+  heads: 4
+  dropout: 0.1
+  activation: "relu"
+  use_layer_norm: true
+  decoder_hidden_dims: [64, 32]
+  # Macro anchor
+  n_segments: 12
+  macro_gnn_layers: 2
+  macro_gnn_aggr: "mean"
+  include_anchor_static: true
+  fusion_method: "gated_residual"
+  fusion_per_layer: true
+
+# MS-HGT additive fusion variant (ablation)
+ms_hgt_additive:
+  mesh_feat_dim: 15
+  beam_feat_dim: 11
+  plate_feat_dim: 6
+  hidden_dim: 128
+  num_layers: 3
+  heads: 4
+  dropout: 0.1
+  activation: "relu"
+  use_layer_norm: true
+  decoder_hidden_dims: [64, 32]
+  n_segments: 12
+  macro_gnn_layers: 2
+  macro_gnn_aggr: "mean"
+  include_anchor_static: true
+  fusion_method: "additive"
+  fusion_per_layer: true

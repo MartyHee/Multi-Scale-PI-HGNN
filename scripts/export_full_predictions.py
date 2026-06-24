@@ -62,6 +62,7 @@ from src.models.baselines import (
     HGTBaseline,
     OursBaseline,
     OursBaselineV2,
+    MSHGTBaseline,
 )
 from src.utils.metrics import compute_all_metrics
 
@@ -83,6 +84,8 @@ MODEL_NAMES_MAP = {
     "hgt": "HGTBaseline",
     "ours_base": "OursBaseline",
     "ours_base_v2": "OursBaselineV2",
+    "ms_hgt": "MSHGTBaseline",
+    "ms_hgt_additive": "MSHGTBaseline",
 }
 
 MODEL_CONFIG_KEYS = {
@@ -93,6 +96,8 @@ MODEL_CONFIG_KEYS = {
     "hgt": "hgt",
     "ours_base": "ours_base",
     "ours_base_v2": "ours_base_v2",
+    "ms_hgt": "ms_hgt",
+    "ms_hgt_additive": "ms_hgt_additive",
 }
 
 # ---------------------------------------------------------------------------
@@ -227,6 +232,25 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             gate_scale=model_cfg.get("gate_scale", 0.1),
             use_edge_bias=model_cfg.get("use_edge_bias", False),
             edge_bias_scale=model_cfg.get("edge_bias_scale", 0.0),
+        )
+    elif model_name in ("ms_hgt", "ms_hgt_additive"):
+        model = MSHGTBaseline(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 3),
+            heads=model_cfg.get("heads", 4),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+            n_segments=model_cfg.get("n_segments", 12),
+            macro_gnn_layers=model_cfg.get("macro_gnn_layers", 2),
+            macro_gnn_aggr=model_cfg.get("macro_gnn_aggr", "mean"),
+            include_anchor_static=model_cfg.get("include_anchor_static", True),
+            fusion_method=model_cfg.get("fusion_method", "gated_residual"),
+            fusion_per_layer=model_cfg.get("fusion_per_layer", True),
         )
     else:
         raise ValueError(f"Unknown model '{model_name}'. Options: {list(MODEL_NAMES_MAP.keys())}")

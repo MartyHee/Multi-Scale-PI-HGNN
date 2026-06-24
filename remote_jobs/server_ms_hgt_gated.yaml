@@ -1,0 +1,63 @@
+# =============================================================================
+# server_ms_hgt_gated.yaml — Stage 4 MS-HGT gated residual fusion training
+#
+# Purpose:
+#   Train MSHGTBaseline (Multi-Scale HGT) with geometric macro anchor graph
+#   and gated residual cross-scale fusion.
+#
+# Architecture:
+#   - HGT backbone (3 layers, 4 heads, hidden_dim=128)
+#   - MacroAnchorPool: geometric along X (n_segments=12)
+#   - Shared MacroGNN: 2-layer SAGEConv (mean aggr)
+#   - CrossScaleFusion: gated_residual, per_layer=true
+#   - Dual decoders: MLPHead [64, 32]
+#
+# This is the PRIMARY Stage 4 experiment (experiment #3 in plan v2.0).
+#
+# Expected metrics (if macro anchor is effective):
+#   - Disp R² >= 0.976 (no degradation)
+#   - Dy R² > 0.910 (midspan Dy improvement target: >0.900)
+#   - Midspan Disp R² > 0.950 (current HGT baseline: 0.9426)
+#   - High-response translational R² > 0.750 (current HGT: 0.6455)
+#   - Combined RelMAE < 0.068
+#   - Force R² >= 0.988
+#
+# Reference:
+#   - docs/stage4_macro_anchor_design.md
+#   - docs/stage4_experiment_plan.md (v2.0)
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_ms_hgt_gated.yaml
+# =============================================================================
+
+# Model key (train_baseline.py --model)
+model: "ms_hgt"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training
+epochs: 200
+batch_size: 8
+
+# Model config overrides
+model_config:
+  fusion_method: "gated_residual"
+  fusion_per_layer: true
+  n_segments: 12
+  macro_gnn_layers: 2
+
+# Naming
+run_name: "server_ms_hgt_gated"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true
