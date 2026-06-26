@@ -271,41 +271,97 @@ python scripts/compute_region_labels.py \\
 
 ---
 
-## 6. 最终汇报模板
+## 6. 实验结果 (v3.0)
 
-MS-HGT full training 完成后应汇报：
+### 6.1 实验对比
 
-```
-## MS-HGT Full Training 结果
+| 指标 | HGT (200ep) | MS-HGT additive | MS-HGT gated | Δ (gated vs HGT) |
+|:-----|:-----------:|:---------------:|:------------:|:-----------------:|
+| **Disp R² (macro)** | 0.9765 | 0.9950 | **0.9952** | **+0.0187** |
+| **Force R² (macro)** | 0.9893 | 0.9931 | **0.9928** | +0.0035 |
+| **Dy R²** | 0.9054 | 0.9934 | **0.9925** | **+0.0871** |
+| **Combined RelMAE** | 0.0676 | 0.0531 | **0.0519** | -23% |
+| **Parameters** | 744,279 | 844,119 | 893,527 | +149,248 |
+| **Best epoch** | 104 | 151 | **85** | 更快收敛 |
+| **Training time** | 29,006s (8.1h) | 50,898s (14.1h) | 34,251s (9.5h) | +18% |
 
-### 实验对比
-| 指标 | HGT baseline | MS-HGT additive | MS-HGT gated | Δ (gated) |
-|------|:----------:|:---------------:|:------------:|:---------:|
+### 6.2 Per-component Disp R²
 
-### Per-component Disp R²
-| Component | HGT | MS-HGT | Δ |
-|:---------:|:---:|:------:|:-:|
+| Component | HGT | MS-HGT gated | Δ |
+|:---------:|:---:|:------------:|:-:|
+| Dx | 0.9899 | 0.9958 | +0.0059 |
+| **Dy** | **0.9054** | **0.9925** | **+0.0871** 🚀 |
+| Dz | 0.9908 | 0.9964 | +0.0056 |
+| Rx | 0.9923 | 0.9964 | +0.0041 |
+| Ry | 0.9932 | 0.9962 | +0.0030 |
+| Rz | 0.9877 | 0.9938 | +0.0061 |
 
-### Region-wise Disp R²（实测 HGT baseline）
-| Region | HGT baseline | MS-HGT additive | MS-HGT gated | Δ (gated) |
-|:------:|:-----------:|:---------------:|:------------:|:---------:|
-| support | 0.9673 | | | |
-| midspan | 0.9426 | | | |
-| end_neighborhood | 0.9697 | | | |
-| transition | 0.9774 | | | |
+### 6.3 Region-wise Disp R²
 
-### High-Response Subset Disp R²（实测 HGT baseline）
-| Subset | HGT baseline | MS-HGT gated | Δ |
-|:------:|:-----------:|:-------------:|:-:|
-| translational top 10% | 0.6455 | | |
-| Dy top 10% | 0.9791 | | |
+| Region | Nodes | HGT | MS-HGT gated | MS-HGT additive | Δ (gated vs HGT) |
+|:------:|:-----:|:---:|:------------:|:---------------:|:----------------:|
+| support | 28,000 | 0.9727 | 0.9802 | 0.9800 | +0.0075 |
+| **midspan** | 1,232,000 | **0.9419** | **0.9816** | 0.9801 | **+0.0397** 🚀 |
+| end_neighborhood | 420,000 | 0.9732 | 0.9845 | 0.9869 | +0.0113 |
+| transition | 2,016,000 | 0.9769 | 0.9952 | 0.9951 | **+0.0183** |
 
-### Conclusion
-1. Macro anchor 是否有效？midspan Dy 是否改善？
-2. 哪种 fusion 最优（additive vs gated）？
-3. 高响应尾部误差是否有显著改善？
-4. 下一步：进入 Stage 5 (physics loss) 还是需要先优化 macro？
-```
+### 6.4 Region-wise Dy R²
+
+| Region | HGT | MS-HGT gated | MS-HGT additive | Δ (gated) |
+|:------:|:---:|:------------:|:---------------:|:---------:|
+| support | 0.9805 | 0.9910 | 0.9885 | +0.0105 |
+| **midspan** | **0.8791** | **0.9932** | 0.9929 | **+0.1141** 🚀 |
+| end_neighborhood | 0.9410 | 0.9920 | 0.9931 | **+0.0510** |
+| transition | 0.9104 | 0.9923 | 0.9937 | **+0.0819** |
+
+### 6.5 High-Response Subsets (top 10%)
+
+| Subset | HGT | MS-HGT gated | MS-HGT additive | Δ (gated) |
+|:------:|:---:|:------------:|:---------------:|:---------:|
+| **translational top 10% Dy R²** | **0.8440** | **0.9925** | 0.9915 | **+0.1485** 🚀 |
+| Dy top 10% Dy R² | 0.9301 | 0.9934 | 0.9960 | **+0.0633** |
+| translational top 10% MAE | 0.000269 | **0.000153** | 0.000155 | **-43%** |
+
+### 6.6 Per-Component Tail Error（各区域 worst P95 AE）
+
+| Component | HGT worst | region | MS-HGT worst | region | 改善 |
+|:---------:|:---------:|:------:|:------------:|:------:|:----:|
+| Dy | 0.000385 | midspan | **0.000117** | end_neighborhood | **-70%** |
+| Dx | 0.000531 | support | **0.000367** | support | -31% |
+| Dz | 0.002215 | midspan | **0.001216** | support | -45% |
+
+### 6.7 Support BC Residual
+
+| DOF | HGT MAE | MS-HGT gated | MS-HGT additive |
+|:---:|:-------:|:------------:|:---------------:|
+| Dx | 0.000231 | 0.000213 | **0.000127** |
+| Dy | 0.000014 | **0.000007** | 0.000012 |
+| Dz | **0.000319** | 0.000492 | 0.000374 |
+| **Translation BC MAE** | **0.000179** | 0.000242 | **0.000171** |
+
+> 注：MS-HGT gated 的 BC residual 略高于 HGT（0.000242 vs 0.000179），但 additive variant 的 BC residual 更低（0.000171）。这可能是因为 gated fusion 更倾向于优化全局长程传力，轻微牺牲了局部 BC 约束精度。
+
+### 6.8 Gate 统计分析
+
+| 参数 | 值 |
+|:----|:---:|
+| Fusion 模块数 | 1（共享于3层） |
+| gate_net 最后一层 bias 均值 | -1.65（初始 -2.0） |
+| gate_net bias 范围 | [-2.87, -0.52] |
+| 等效 gate 值范围 | ~0.05 ~ 0.37 |
+| 状态 | ✅ 非退化（gate 部分打开，不全0/全1） |
+
+### 6.9 结论：下一步 → Stage 5
+
+**关于 Macro 效果：**
+1. ✅ **Macro anchor 非常有效** — 所有区域全面改善，midspan Dy R² 从 0.879 提升到 0.993
+2. ✅ **高响应尾部误差被显著压缩** — translational high-response Dy R² 从 0.844 提升到 0.993
+3. ✅ **gated 和 additive 效果高度一致** — gated 在 midspan 略优（+0.0015），additive 在 BC residual 略优
+4. ✅ **Gate 非退化** — gate 分布在 0.05~0.37，macro signal 被部分利用但不过度支配
+5. ✅ **参数增量合理** — +149,248 / 20% 增加，训练时间 +18%
+6. ✅ **Dy 不再是最短板** — 所有分量 R² 均 > 0.992
+
+**结论：MS-HGT 已验证宏观锚点多尺度融合对长程传力建模的系统性改善。** 建议 **立即进入 Stage 5**（物理正则损失），同时保留 MS-HGT gated 作为 backbone。
 
 ---
 
@@ -315,7 +371,8 @@ MS-HGT full training 完成后应汇报：
 |:----:|:----:|:----:|----------|
 | v1.0 | 2026-06-24 | Claude Code | 初版 — 实验计划 |
 | v2.0 | 2026-06-24 | Claude Code | 移除 w/o feedback 实验；添加实测 HGT region-wise baseline；更新 region 标签实现细节 |
+| v3.0 | 2026-06-26 | Claude Code | 添加 MS-HGT 完整实验结果、region-wise 对比、gate 分析、结论与 Stage 5 建议 |
 
 ---
 
-*本文档为 Stage 4 实验计划，定义了实验矩阵、成功标准、区域评估方案、实现时间线和汇报模板。请先审阅设计规格书 (`stage4_macro_anchor_design.md`)，确认后进入实现阶段。*
+*本文档为 Stage 4 实验计划，定义了实验矩阵、成功标准、区域评估方案、实现时间线和汇报模板。当前状态：**完成**。*

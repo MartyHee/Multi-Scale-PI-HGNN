@@ -41,6 +41,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
+from src.losses.physics_loss import compute_physics_losses
 from src.trainers.early_stopping import EarlyStopping
 from src.trainers.losses import CombinedLoss
 from src.utils.experiment import CSVLogger, plot_loss_curve, plot_metric_curve
@@ -88,6 +89,8 @@ class BaselineTrainer:
         disp_std: (6,) tensor — std for disp inverse transform.
         force_mean: (12,) tensor — mean for force inverse transform.
         force_std: (12,) tensor — std for force inverse transform.
+        scaler: ``HeteroFeatureScaler`` (optional) — used by physics loss
+            for support-flag restoration via ``_stats``.
     """
 
     def __init__(
@@ -102,6 +105,7 @@ class BaselineTrainer:
         disp_std: Optional[torch.Tensor] = None,
         force_mean: Optional[torch.Tensor] = None,
         force_std: Optional[torch.Tensor] = None,
+        scaler=None,
     ):
         self.model = model
         self.train_loader = train_loader
@@ -113,6 +117,13 @@ class BaselineTrainer:
         self.disp_std = disp_std
         self.force_mean = force_mean
         self.force_std = force_std
+        self.scaler = scaler
+
+        # ---- Physics losses (Stage 5) ----
+        self.lambda_bc = config.get("lambda_bc", 0.0)
+        self.lambda_link = config.get("lambda_link", 0.0)
+        self.physics_enabled = (self.lambda_bc > 0 or self.lambda_link > 0)
+        self._physics_dofs = config.get("physics_dofs", "translation")
 
         # ---- Progress / logging config ----
         prog_cfg = config.get("progress", {})
@@ -184,16 +195,28 @@ class BaselineTrainer:
     # Core loops
     # ============================================================
 
-    def _train_epoch(self) -> Tuple[float, float, float]:
+    def _train_epoch(self) -> Dict:
         """Run one training epoch.
 
         Returns:
-            ``(mean_total_loss, mean_disp_loss, mean_force_loss)``.
+            Dict with loss values and physics-loss diagnostics:
+
+            - ``"loss"`` — total loss (supervised + physics)
+            - ``"disp_loss"`` — displacement MSE
+            - ``"force_loss"`` — force MSE
+            - ``"bc_loss"`` — BC translation loss (unweighted)
+            - ``"link_loss"`` — link consistency loss (unweighted)
+            - ``"n_bc_dofs"`` — number of constrained BC DOFs
+            - ``"n_link_edges"`` — number of structural link edges used
         """
         self.model.train()
         total_loss = 0.0
         total_disp_loss = 0.0
         total_force_loss = 0.0
+        total_bc_loss = 0.0
+        total_link_loss = 0.0
+        total_n_bc_dofs = 0
+        total_n_link_edges = 0
         num_batches = 0
 
         iterator = self.train_loader
@@ -212,43 +235,80 @@ class BaselineTrainer:
             self.optimizer.zero_grad()
             pred_disp, pred_force = self.model(batch)
 
-            loss_total, loss_disp, loss_force = self.loss_fn(
+            # Supervised loss (always)
+            loss_sup, loss_disp, loss_force = self.loss_fn(
                 pred_disp, pred_force,
                 batch["mesh_node"].y_disp, batch["beam_element"].y_force,
             )
+
+            # Physics losses (optional)
+            bc_loss_val = 0.0
+            link_loss_val = 0.0
+            bc_dofs = 0
+            link_edges = 0
+
+            if self.physics_enabled:
+                phy_total, phy_bc, phy_link, bc_dofs, link_edges = compute_physics_losses(
+                    pred_disp, batch["mesh_node"].y_disp, batch,
+                    lambda_bc=self.lambda_bc, lambda_link=self.lambda_link,
+                    scaler=self.scaler,
+                )
+                bc_loss_val = phy_bc.item()
+                link_loss_val = phy_link.item()
+                loss_total = loss_sup + phy_total
+            else:
+                loss_total = loss_sup
+
             loss_total.backward()
             self.optimizer.step()
 
             total_loss += loss_total.item()
             total_disp_loss += loss_disp.item()
             total_force_loss += loss_force.item()
+            total_bc_loss += bc_loss_val
+            total_link_loss += link_loss_val
+            total_n_bc_dofs += bc_dofs
+            total_n_link_edges += link_edges
             num_batches += 1
 
             # Update tqdm postfix or log periodically
             if self.use_tqdm and hasattr(iterator, "set_postfix"):
-                iterator.set_postfix({
+                postfix = {
                     "loss": f"{loss_total.item():.4f}",
                     "D": f"{loss_disp.item():.4f}",
                     "F": f"{loss_force.item():.4f}",
-                })
+                }
+                if self.physics_enabled:
+                    postfix["BC"] = f"{bc_loss_val:.4f}"
+                    postfix["LK"] = f"{link_loss_val:.4f}"
+                iterator.set_postfix(postfix)
             elif not self.use_tqdm and (batch_idx + 1) % max(1, self.log_interval) == 0:
-                print(
+                msg = (
                     f"    Epoch {self.current_epoch} | Batch {batch_idx + 1}/{len(self.train_loader)} "
                     f"| Loss: {loss_total.item():.4f} (D:{loss_disp.item():.4f} F:{loss_force.item():.4f})"
                 )
+                if self.physics_enabled:
+                    msg += f" BC:{bc_loss_val:.4f} LK:{link_loss_val:.4f}"
+                print(msg)
 
-        return (
-            total_loss / max(num_batches, 1),
-            total_disp_loss / max(num_batches, 1),
-            total_force_loss / max(num_batches, 1),
-        )
+        nb = max(num_batches, 1)
+        return {
+            "loss": total_loss / nb,
+            "disp_loss": total_disp_loss / nb,
+            "force_loss": total_force_loss / nb,
+            "bc_loss": total_bc_loss / nb,
+            "link_loss": total_link_loss / nb,
+            "n_bc_dofs": total_n_bc_dofs,
+            "n_link_edges": total_n_link_edges,
+        }
 
     @torch.no_grad()
     def _val_epoch(self) -> Dict:
         """Run validation.
 
         Returns:
-            Dict with loss and metrics (both standardised and original-scale).
+            Dict with loss and metrics (both standardised and original-scale),
+            plus physics-loss diagnostics when enabled.
         """
         self.model.eval()
         all_disp_pred: List[torch.Tensor] = []
@@ -256,6 +316,10 @@ class BaselineTrainer:
         all_force_pred: List[torch.Tensor] = []
         all_force_target: List[torch.Tensor] = []
         total_loss = 0.0
+        total_bc_loss = 0.0
+        total_link_loss = 0.0
+        total_n_bc_dofs = 0
+        total_n_link_edges = 0
         num_batches = 0
 
         for batch in self.val_loader:
@@ -268,6 +332,18 @@ class BaselineTrainer:
             )
             total_loss += loss_total.item()
             num_batches += 1
+
+            # Physics losses (logging only — NOT for validation metric)
+            if self.physics_enabled:
+                _, phy_bc, phy_link, bc_dofs, link_edges = compute_physics_losses(
+                    pred_disp, batch["mesh_node"].y_disp, batch,
+                    lambda_bc=self.lambda_bc, lambda_link=self.lambda_link,
+                    scaler=self.scaler,
+                )
+                total_bc_loss += phy_bc.item()
+                total_link_loss += phy_link.item()
+                total_n_bc_dofs += bc_dofs
+                total_n_link_edges += link_edges
 
             all_disp_pred.append(pred_disp.cpu())
             all_disp_target.append(batch["mesh_node"].y_disp.cpu())
@@ -288,8 +364,13 @@ class BaselineTrainer:
         disp_metrics = compute_all_metrics(disp_pred_orig, disp_target_orig)
         force_metrics = compute_all_metrics(force_pred_orig, force_target_orig)
 
+        nb = max(num_batches, 1)
         return {
-            "val_loss": total_loss / max(num_batches, 1),
+            "val_loss": total_loss / nb,
+            "val_loss_bc": total_bc_loss / nb,
+            "val_loss_link": total_link_loss / nb,
+            "val_n_bc_dofs": total_n_bc_dofs,
+            "val_n_link_edges": total_n_link_edges,
             "val_disp_mae": disp_metrics["macro_avg"]["mae"],
             "val_disp_r2": disp_metrics["macro_avg"]["r2"],
             "val_force_mae": force_metrics["macro_avg"]["mae"],
@@ -344,18 +425,28 @@ class BaselineTrainer:
         print(f"Val samples:   {len(self.val_loader.dataset)}")
         print(f"Batch size:    {self.train_loader.batch_size}")
         print(f"Progress bar:  {'tqdm' if self.use_tqdm else 'console log'}")
+        if self.physics_enabled:
+            print(f"Physics loss:  BC λ={self.lambda_bc} | Link λ={self.lambda_link}")
         print(f"{'=' * 60}\n")
 
         # CSV logger with best-epoch tracking columns
+        csv_fieldnames = [
+            "epoch", "train_loss", "val_loss",
+            "val_disp_mae", "val_disp_r2",
+            "val_force_mae", "val_force_r2",
+            "lr", "epoch_time_sec",
+            "best_epoch", "best_val_loss",
+        ]
+        if self.physics_enabled:
+            csv_fieldnames += [
+                "train_loss_bc", "train_loss_link",
+                "val_loss_bc", "val_loss_link",
+                "n_bc_dofs", "n_link_edges",
+                "lambda_bc", "lambda_link",
+            ]
         csv_logger = CSVLogger(
             self.experiment_dir / "train_log.csv",
-            fieldnames=[
-                "epoch", "train_loss", "val_loss",
-                "val_disp_mae", "val_disp_r2",
-                "val_force_mae", "val_force_r2",
-                "lr", "epoch_time_sec",
-                "best_epoch", "best_val_loss",
-            ],
+            fieldnames=csv_fieldnames,
         )
 
         # Build last-checkpoint skeleton (filled each epoch)
@@ -373,11 +464,22 @@ class BaselineTrainer:
             t_epoch = time.time()
 
             # ---- Train ----
-            train_loss, train_disp_loss, train_force_loss = self._train_epoch()
+            train_result = self._train_epoch()
+            train_loss = train_result["loss"]
+            train_disp_loss = train_result["disp_loss"]
+            train_force_loss = train_result["force_loss"]
+            train_bc_loss = train_result["bc_loss"]
+            train_link_loss = train_result["link_loss"]
+            train_n_bc_dofs = train_result["n_bc_dofs"]
+            train_n_link_edges = train_result["n_link_edges"]
 
             # ---- Validate ----
             val_results = self._val_epoch()
             val_loss = val_results["val_loss"]
+            val_bc_loss = val_results.get("val_loss_bc", 0.0)
+            val_link_loss = val_results.get("val_loss_link", 0.0)
+            val_n_bc_dofs = val_results.get("val_n_bc_dofs", 0)
+            val_n_link_edges = val_results.get("val_n_link_edges", 0)
 
             # ---- LR ----
             current_lr = self.optimizer.param_groups[0]["lr"]
@@ -423,7 +525,7 @@ class BaselineTrainer:
             _atomic_save(self.model.state_dict(), self.experiment_dir / "last_model.pt")
 
             # ---- CSV row ----
-            csv_logger.append({
+            csv_row = {
                 "epoch": epoch,
                 "train_loss": f"{train_loss:.6f}",
                 "val_loss": f"{val_loss:.6f}",
@@ -435,14 +537,26 @@ class BaselineTrainer:
                 "epoch_time_sec": f"{epoch_time:.2f}",
                 "best_epoch": self._best_epoch,
                 "best_val_loss": f"{self._best_val_loss:.6f}",
-            })
+            }
+            if self.physics_enabled:
+                csv_row.update({
+                    "train_loss_bc": f"{train_bc_loss:.6f}",
+                    "train_loss_link": f"{train_link_loss:.6f}",
+                    "val_loss_bc": f"{val_bc_loss:.6f}",
+                    "val_loss_link": f"{val_link_loss:.6f}",
+                    "n_bc_dofs": train_n_bc_dofs + val_n_bc_dofs,
+                    "n_link_edges": train_n_link_edges + val_n_link_edges,
+                    "lambda_bc": f"{self.lambda_bc:.6f}",
+                    "lambda_link": f"{self.lambda_link:.6f}",
+                })
+            csv_logger.append(csv_row)
 
             # ---- Console log ----
             elapsed = time.time() - t_start
             avg_epoch_time = elapsed / epoch
             remaining = avg_epoch_time * (epochs - epoch)
             best_marker = " *BEST" if is_best else ""
-            print(
+            log_msg = (
                 f"Epoch {epoch:3d}/{epochs} | "
                 f"Train: {train_loss:.4f} | "
                 f"Val: {val_loss:.4f} | "
@@ -454,6 +568,12 @@ class BaselineTrainer:
                 f"{epoch_time:.1f}s | "
                 f"ETA:{remaining:.0f}s{best_marker}"
             )
+            if self.physics_enabled:
+                log_msg += (
+                    f" | BC:{train_bc_loss:.4f}/{val_bc_loss:.4f}"
+                    f" LK:{train_link_loss:.4f}/{val_link_loss:.4f}"
+                )
+            print(log_msg)
 
             # ---- Early stopping ----
             if self.early_stopping is not None:

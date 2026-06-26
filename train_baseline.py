@@ -502,6 +502,11 @@ def main(args: argparse.Namespace):
     config.setdefault("train", {})["device"] = str(device)
     if args.run_name:
         config["run_name"] = args.run_name
+    # Physics loss lambda overrides
+    if args.lambda_bc is not None:
+        config["lambda_bc"] = args.lambda_bc
+    if args.lambda_link is not None:
+        config["lambda_link"] = args.lambda_link
 
     print(f"\n  Split mode:    {split_mode}")
     print(f"  Batch size:    {batch_size}")
@@ -605,6 +610,13 @@ def main(args: argparse.Namespace):
         "trainable_params": num_trainable,
         "model_config": model_cfg,
         "input_construction": _get_input_construction_desc(model_name, model_cfg),
+        "physics_loss": {
+            "enabled": (config.get("lambda_bc", 0.0) > 0.0 or config.get("lambda_link", 0.0) > 0.0),
+            "lambda_bc": config.get("lambda_bc", 0.0),
+            "lambda_link": config.get("lambda_link", 0.0),
+            "bc_dofs": "translation",
+            "link_dofs": "translation",
+        },
     }
     with open(exp_dir / "model_summary.json", "w", encoding="utf-8") as f:
         json.dump(model_summary, f, indent=2, ensure_ascii=False)
@@ -624,6 +636,12 @@ def main(args: argparse.Namespace):
     train_config["progress"] = config.get("progress", {})
     train_config["model_name"] = model_name
     train_config["split_mode"] = split_mode
+    # Copy physics loss config into train_config for the trainer
+    lambda_bc_val = config.get("lambda_bc", config.get("train", {}).get("lambda_bc", 0.0))
+    lambda_link_val = config.get("lambda_link", config.get("train", {}).get("lambda_link", 0.0))
+    train_config["lambda_bc"] = lambda_bc_val
+    train_config["lambda_link"] = lambda_link_val
+    train_config["physics_dofs"] = config.get("physics_dofs", config.get("train", {}).get("physics_dofs", "translation"))
     trainer = BaselineTrainer(
         model=model,
         train_loader=train_loader,
@@ -635,6 +653,7 @@ def main(args: argparse.Namespace):
         disp_std=disp_std,
         force_mean=force_mean,
         force_std=force_std,
+        scaler=scaler,
     )
     train_summary = trainer.fit()
 
@@ -838,6 +857,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
                    help="Device override (auto | cuda | cpu)")
     p.add_argument("--run-name", type=str, default=None,
                    help="Descriptive run name (saved in config, no functional effect)")
+    p.add_argument("--lambda-bc", type=float, default=None,
+                   help="Support BC translation loss weight (default: from config, 0.0)")
+    p.add_argument("--lambda-link", type=float, default=None,
+                   help="Structural link translation consistency loss weight (default: from config, 0.0)")
     p.add_argument("--summarise-only", action="store_true",
                    help="Only generate summary from existing experiments, no training")
     return p.parse_args(argv)

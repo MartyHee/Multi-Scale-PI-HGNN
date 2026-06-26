@@ -51,6 +51,8 @@ MAX_GRAPHS=$(_yaml_val "max_graphs")
 NUM_WORKERS=$(_yaml_val "num_workers")
 DEVICE=$(_yaml_val "device")
 RUN_NAME=$(_yaml_val "run_name")
+LAMBDA_BC=$(_yaml_val "lambda_bc")
+LAMBDA_LINK=$(_yaml_val "lambda_link")
 PACKAGE_ARTIFACT=$(_yaml_val "package_artifact")
 SAVE_BEST=$(_yaml_val "save_best_model")
 SAVE_LAST=$(_yaml_val "save_last_model")
@@ -126,6 +128,8 @@ CMD_EXTRA=""
 [ -n "$SPLIT_MODE" ] && [ "$SPLIT_MODE" != "null" ] && CMD_EXTRA="$CMD_EXTRA --split-mode $SPLIT_MODE"
 [ -n "$DEVICE" ] && [ "$DEVICE" != "null" ] && CMD_EXTRA="$CMD_EXTRA --device $DEVICE"
 [ -n "$RUN_NAME" ] && [ "$RUN_NAME" != "null" ] && CMD_EXTRA="$CMD_EXTRA --run-name $RUN_NAME"
+[ -n "$LAMBDA_BC" ] && [ "$LAMBDA_BC" != "null" ] && CMD_EXTRA="$CMD_EXTRA --lambda-bc $LAMBDA_BC"
+[ -n "$LAMBDA_LINK" ] && [ "$LAMBDA_LINK" != "null" ] && CMD_EXTRA="$CMD_EXTRA --lambda-link $LAMBDA_LINK"
 
 echo "  Training command:"
 echo "    python train_baseline.py --model ${MODEL} ${CMD_EXTRA}"

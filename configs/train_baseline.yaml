@@ -25,6 +25,11 @@ train:
   lambda_force: 1.0
   loss_name: "mse"                  # mse | l1 | smooth_l1
 
+  # ---- Physics loss (Stage 5) ----
+  lambda_bc: 0.0                    # Support BC translation loss weight
+  lambda_link: 0.0                  # Structural link translation consistency weight
+  physics_dofs: "translation"       # Currently only "translation" is supported
+
 progress:
   use_tqdm: true                    # show per-batch tqdm progress bar
   log_interval: 20                  # fallback console-log interval when tqdm=False

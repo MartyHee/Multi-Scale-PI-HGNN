@@ -1,0 +1,66 @@
+# =============================================================================
+# server_ms_pi_hgt_full.yaml — Stage 5 MS-PI-HGT full physics loss training
+#
+# Purpose:
+#   Train MSHGTBaseline with BC + Link physics losses.
+#   Stage 5 backbone: MS-HGT gated (same architecture as Stage 4 best model).
+#
+# Physics loss:
+#   - lambda_bc = 0.08  (BC translation MSE on constrained DOFs)
+#   - lambda_link = 0.002 (link translation consistency MSE)
+#
+# Architecture (unchanged from Stage 4 MS-HGT gated):
+#   - HGT backbone (3 layers, 4 heads, hidden_dim=128)
+#   - MacroAnchorPool: geometric along X (n_segments=12)
+#   - Shared MacroGNN: 2-layer SAGEConv (mean aggr)
+#   - CrossScaleFusion: gated_residual, per_layer=true
+#   - Dual decoders: MLPHead [64, 32]
+#
+# Expected impact:
+#   - Translation BC MAE < 0.000242 (Stage 4 baseline)
+#   - Translation BC MAE ideally <= 0.000179
+#   - Link translation consistency residual decreases
+#   - Disp R² >= 0.994
+#   - Dy R² >= 0.9905
+#   - RelMAE <= 0.054
+#   - Midspan Dy R² > 0.990
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/server_ms_pi_hgt_full.yaml
+# =============================================================================
+
+# Model key (train_baseline.py --model, same as Stage 4 backbone)
+model: "ms_hgt"
+
+# Dataset
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+# Hardware
+device: "cuda"
+num_workers: 4
+
+# Training
+epochs: 200
+batch_size: 8
+
+# Model config overrides (same as Stage 4 MS-HGT gated)
+model_config:
+  fusion_method: "gated_residual"
+  fusion_per_layer: true
+  n_segments: 12
+  macro_gnn_layers: 2
+
+# Physics loss — BC + Link full
+lambda_bc: 0.08
+lambda_link: 0.002
+
+# Naming
+run_name: "server_ms_pi_hgt_full"
+
+# Checkpoint
+save_best_model: true
+save_last_model: true
+
+# Artifact
+package_artifact: true
