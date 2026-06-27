@@ -162,18 +162,32 @@ echo "=========================================="
 echo " [5/5] Artifact packaging"
 echo "=========================================="
 
-# Find the latest experiment dir for this model
-MODEL_UPPER=$(echo "$MODEL" | tr '[:lower:]' '[:upper:]')
-LATEST_RUN=$(find "${PROJECT_DIR}/outputs/baselines/${MODEL_UPPER}" -maxdepth 1 -type d 2>/dev/null | sort | tail -1 || true)
+# Capture RUN_DIR from training output (printed by train_baseline.py as RUN_DIR=<path>)
+# This is robust against parallel execution because each job has its own LOG_FILE.
+RUN_DIR=$(grep -oP '^RUN_DIR=\K.+' "$LOG_FILE" | tail -1 || true)
 
-if [ "$PACKAGE_ARTIFACT" = "true" ] && [ -n "$LATEST_RUN" ]; then
+if [ -z "$RUN_DIR" ]; then
+    echo "[ERROR] Could not determine RUN_DIR from training output."
+    echo "        train_baseline.py must print 'RUN_DIR=<output_dir>' for packaging."
+    echo "        Skipping artifact packaging to avoid packaging wrong directory."
+    echo ""
+    echo "  Training log: ${LOG_FILE}"
+    echo "  Exit code: ${TRAIN_EXIT_CODE}"
+    echo ""
+    echo "=========================================="
+    echo " Job finished (no artifact): ${JOB_NAME}"
+    echo "=========================================="
+    exit $TRAIN_EXIT_CODE
+fi
+
+if [ "$PACKAGE_ARTIFACT" = "true" ] && [ -d "$RUN_DIR" ]; then
     INCLUDE_LAST_FLAG=""
     if [ "$SAVE_LAST" = "true" ]; then
         INCLUDE_LAST_FLAG="--include-last"
     fi
-    bash "$PROJECT_DIR/server_ops/package_results.sh" "$LATEST_RUN" "$JOB_NAME" $INCLUDE_LAST_FLAG
-elif [ "$PACKAGE_ARTIFACT" = "true" ] && [ -z "$LATEST_RUN" ]; then
-    echo "  [WARN] No run directory found — skipping artifact packaging."
+    bash "$PROJECT_DIR/server_ops/package_results.sh" "$RUN_DIR" "$JOB_NAME" $INCLUDE_LAST_FLAG
+elif [ "$PACKAGE_ARTIFACT" = "true" ] && [ ! -d "$RUN_DIR" ]; then
+    echo "  [WARN] Run directory not found: ${RUN_DIR} — skipping artifact packaging."
 else
     echo "  Artifact packaging disabled (package_artifact != true)."
 fi

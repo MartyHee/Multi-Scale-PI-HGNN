@@ -598,6 +598,7 @@ def main(args: argparse.Namespace):
         model_name=model_name.upper(),
     )
     print(f"  Output: {exp_dir}")
+    print(f"RUN_DIR={exp_dir}")
 
     # Save resolved config
     save_resolved_config(config, exp_dir / "config_resolved.yaml")
