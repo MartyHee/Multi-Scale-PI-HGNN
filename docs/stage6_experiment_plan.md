@@ -195,7 +195,7 @@ python scripts/analyze_conformal.py \
 
 **Main UQ table (marginal coverage):**
 
-| Output | Domain | 90% Coverage | 90% Avg Width | 95% Coverage | 95% Avg Width |
+| Output | Domain | 90% Coverage | 90% Avg Half-Width | 95% Coverage | 95% Avg Half-Width |
 |--------|--------|:-----------:|:-------------:|:-----------:|:-------------:|
 | Displacement | All DOF | | | | |
 | Displacement | Dx | | | | |
@@ -214,7 +214,7 @@ python scripts/analyze_conformal.py \
 
 **Region-wise coverage table (supplementary):**
 
-| Region | 90% Coverage | 90% Avg Width | Gap |
+| Region | 90% Coverage | 90% Avg Half-Width | Gap |
 |--------|:-----------:|:-------------:|:---:|
 | Support | | | |
 | Midspan | | | |
