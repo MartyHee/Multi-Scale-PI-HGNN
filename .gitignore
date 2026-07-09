@@ -208,7 +208,23 @@ __marimo__/
 
 
 /processed
-/docs/development_log.md
+# Documentation (tracking removed; kept for reference only)
+/docs/
+
+# Paper materials (tracking removed; local only)
+/paper/
+/references/
+/outputs/figures/
+
+# Local backup and cleanup artifacts
+/local_backups/
+/local_cleanup/
+
+# Model checkpoints (large binaries)
+*.pt
+*.pth
+*.ckpt
+*.tar.gz
 /outputs
 /logs
 /remote_artifacts

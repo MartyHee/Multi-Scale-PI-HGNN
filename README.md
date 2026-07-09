@@ -3,45 +3,35 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![PyTorch 2.6](https://img.shields.io/badge/PyTorch-2.6-orange.svg)](https://pytorch.org/)
 [![PyG 2.7](https://img.shields.io/badge/PyG-2.7-green.svg)](https://pytorch-geometric.readthedocs.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> A multi-scale physics-informed heterogeneous graph neural network framework for AI-based structural finite element (FE) surrogate modeling of steel truss girder bridges. This work is targeting **ICTAI 2026** (Tools with Artificial Intelligence / AI Applications track).
+A heterogeneous graph neural network framework for AI-based structural finite element (FE) surrogate modeling of steel truss girder bridges. The framework models the FE system as a heterogeneous graph with typed message passing, macro-anchor multi-scale fusion, physics-informed regularization, and conformal uncertainty quantification.
 
 ---
 
-## Project Background
+## Project Overview
 
 Finite element analysis (FEA) is the standard tool for structural engineering design and evaluation, but each simulation is computationally expensive. For tasks requiring many repeated simulations — design space exploration, uncertainty quantification, or optimization — a fast surrogate model is highly desirable.
 
-**The core challenge:** Structural FE simulation data is inherently heterogeneous. A typical steel truss girder model contains:
-
-- **Mesh nodes** with coordinate, load, and boundary condition features
-- **Beam elements** with section properties, material properties, and geometry
-- **Plate elements** with thickness and material properties
-- **Structural links** representing rigid/elastic connections between nodes
-- Complex relational dependencies across these entity types
-
-Standard MLP or homogeneous GNN approaches cannot fully exploit this heterogeneous structure, leading to suboptimal predictions — particularly for displacement components (e.g., Dy) and high-response regions.
+**Core challenge:** Structural FE simulation data is inherently heterogeneous. A typical steel truss girder model contains mesh nodes with load/boundary features, beam elements with section/material properties, plate elements with thickness, structural links representing connections, and complex relational dependencies across these entity types. Standard MLP or homogeneous GNN approaches cannot fully exploit this heterogeneous structure.
 
 **This project proposes:** A **Multi-Scale Physics-Informed Heterogeneous Graph Transformer (MS-PI-HGT)** that explicitly models the structural FE system as a heterogeneous graph with typed message passing, macro-anchor multi-scale fusion, physics-informed regularization, and conformal uncertainty quantification.
 
 ### Prediction Targets
 
-- **Node displacement** (6-DOF: Dx, Dy, Dz, Rx, Ry, Rz) — 1056 mesh nodes per graph
-- **Beam-end internal force** (12 components: Fx_I..Mz_J) — 1646 beam elements per graph
+- **Node displacement** (6-DOF: Dx, Dy, Dz, Rx, Ry, Rz) — predicted for 1056 mesh nodes per graph
+- **Beam-end internal force** (12 components: Fx_I..Mz_J) — predicted for 1646 beam elements per graph
 
----
+### Supported Models
 
-## Key Features
-
-- **Heterogeneous graph construction** from structural FE data (`mesh_node`, `beam_element`, `plate_element`, `structural_link`)
-- **Typed graph transformer backbone** (HGT-style) with relation-specific message passing
-- **Multi-scale macro-anchor fusion** — stiffness-aware graph pooling and cross-scale gated fusion for long-range force transfer
-- **Physics-informed regularization** — support boundary condition loss + structural link consistency loss
-- **Component-wise split conformal UQ** — distribution-free calibrated prediction intervals (18 output components)
-- **Complete baseline suite** — MLP, GCN, GAT, RGCN, HGT for systematic ablation
-- **Reproducible experiment pipeline** — local smoke test → server training → artifact recovery
-- **Comprehensive diagnostics** — region-wise metrics, tail-error analysis, physical consistency checks
+| Model | Graph Type | Typed Message | Key Features |
+|-------|-----------|:-------------:|-------------|
+| MLP | none | no | Strong local-feature baseline |
+| GCN | homogeneous | no | Homogeneous graph convolution |
+| GAT | homogeneous | no | Homogeneous graph attention |
+| RGCN / HeteroConv | heterogeneous | relation-specific | Type-aware message passing |
+| HGT | heterogeneous | typed attention | Type-dependent attention |
+| MS-HGT | heterogeneous | typed attention | Macro anchor + cross-scale fusion |
+| MS-PI-HGT | heterogeneous | typed attention | + physics-informed regularization + UQ |
 
 ---
 
@@ -79,21 +69,21 @@ Multi-Scale-PI-HGNN/
 │   │   ├── baseline_trainer.py            # Baseline training loop
 │   │   ├── losses.py                      # Supervised losses
 │   │   └── early_stopping.py              # Early stopping
-│   ├── losses/                 # Physics-informed losses (Stage 5)
+│   ├── losses/                 # Physics-informed losses
 │   │   └── physics_loss.py                # BC + link consistency loss
 │   └── utils/                  # Metrics, experiment tracking, I/O
 │       ├── metrics.py                     # Evaluation metrics
 │       └── experiment.py                  # Config, logging, paths
 │
 ├── scripts/                    # Standalone analysis scripts
-│   ├── compute_conformal.py               # Stage 6: conformal UQ
-│   ├── analyze_conformal.py               # Stage 6: coverage analysis
+│   ├── compute_conformal.py               # Conformal UQ computation
+│   ├── analyze_conformal.py               # Coverage analysis & visualization
 │   ├── export_full_predictions.py         # Full test set prediction export
-│   ├── physics_diagnostics.py             # Stage 5: physics analysis
-│   ├── compute_region_labels.py           # Region assignment
+│   ├── physics_diagnostics.py             # Physics consistency diagnostics
+│   ├── compute_region_labels.py           # Region assignment for analysis
 │   └── ...                                # Additional diagnostics
 │
-├── remote_jobs/                # Server job configurations (YAML)
+├── remote_jobs/                # Server training job configurations (YAML)
 │   ├── server_mlp_full.yaml
 │   ├── server_gcn_full.yaml
 │   ├── server_gat_full.yaml
@@ -101,8 +91,6 @@ Multi-Scale-PI-HGNN/
 │   ├── server_hgt_full.yaml
 │   ├── server_ms_hgt_gated.yaml
 │   ├── server_ms_hgt_additive.yaml
-│   ├── server_ms_pi_hgt_bc.yaml
-│   ├── server_ms_pi_hgt_link.yaml
 │   └── server_ms_pi_hgt_full.yaml
 │
 ├── server_ops/                 # Server-side run scripts
@@ -111,47 +99,29 @@ Multi-Scale-PI-HGNN/
 │   ├── export_stage2b_predictions.sh
 │   └── package_results.sh
 │
-├── train.py                    # Unified training entry (Stage 3+)
-├── train_baseline.py           # Baseline training entry (Stage 2)
+├── train.py                    # Unified training entry (Stage 3+ models)
+├── train_baseline.py           # Baseline training entry
 ├── requirements.txt            # Python dependencies
-│
-├── docs/                       # Documentation & experiment records
-│   ├── development_log.md      # Continuous development log
-│   ├── stage2a_baseline_suite_report.md
-│   ├── stage2b_baseline_results_draft.md
-│   ├── stage3_ours_base_design.md
-│   ├── stage4_macro_anchor_design.md
-│   ├── stage4_result_lock.md
-│   ├── stage5_physics_loss_design.md
-│   ├── stage5_experiment_plan.md
-│   ├── stage6_uq_design.md
-│   ├── stage6_experiment_plan.md
-│   ├── stage6_calibration_split_audit.md
-│   ├── ictai_research_story.md
-│   ├── method_literature_inventory.md
-│   ├── experiment_result_and_figure_audit.md
-│   └── ictai_paper_preparation_summary.md
-│
-├── processed/                  # [git-ignored] Built graph datasets
-│   └── hetero_graph_dataset_v2/  # Current mainline dataset
-│
-├── outputs/                    # [git-ignored] Training & diagnostic output
-│   ├── baselines/              # Baseline model checkpoints & logs
-│   └── diagnostics/           # Diagnostic reports & figures
-│
-├── remote_artifacts/           # [git-ignored] Server training artifacts
-│
-└── logs/                       # [git-ignored] Runtime logs
+└── README.md
+```
+
+### **Not tracked in git** (generated locally or large artifacts):
+
+```
+processed/          # Built graph datasets
+outputs/            # Training checkpoints, logs, diagnostics
+remote_artifacts/   # Server training artifact tarballs
+logs/               # Runtime logs
 ```
 
 ---
 
-## Environment
+## Environment Setup
 
 ### Prerequisites
 
 - **Python 3.10+**
-- **Conda** (recommended for environment management)
+- **Conda** (recommended)
 - **CUDA-capable GPU** (tested on 8× RTX 4090; single GPU sufficient for training)
 
 ### Installation
@@ -176,48 +146,46 @@ pip install -r requirements.txt
 
 ### Path Notes
 
-- **Local development (Windows):** Uses Python at `D:\CodeData\software\Anaconda\Anaconda3\envs\llm\python.exe`
-- **Server training (Linux/CUDA):** Uses `conda activate pi_hgnn` with system Python
+- **Local development (Windows):** Use the Python interpreter configured for your environment
+- **Server training (Linux/CUDA):** Activate the `pi_hgnn` conda environment
 - All paths in configs use absolute paths; adjust `raw_data_dir` for your environment
 
 ---
 
-## Data Preparation
+## Dataset Preparation
 
 ### Mainline Dataset: `processed/hetero_graph_dataset_v2`
 
-The v2 heterogeneous graph dataset is built from `GraphTrainingData2`, which contains 70 steel truss girder design samples × 500 load cases = **35,000 graph instances**.
+The v2 heterogeneous graph dataset is built from structural FE data containing 70 steel truss girder design samples × 500 load cases = **35,000 graph instances**.
 
 Each graph contains:
-- **1,056** `mesh_node` entities (15-dim features: xyz, loads, DOF constraint flags)
-- **1,646** `beam_element` entities (11-dim features: section, material, geometry)
-- **832** `plate_element` entities (6-dim features: thickness, material)
-- **132 directed (66 physical)** `structural_link` edges per graph (constant across all 70 samples × 500 load cases; 10-dim attrs: stiffness, beta angle)
-- 5 edge types (`belongs_to_beam`, `rev_belongs_to_beam`, `belongs_to_plate`, `rev_belongs_to_plate`, `structural_link`)
+
+- **1,056** `mesh_node` entities (15-dim features: coordinates, loads, DOF constraint flags)
+- **1,646** `beam_element` entities (11-dim features: section properties, material properties, geometry)
+- **832** `plate_element` entities (6-dim features: thickness, material properties)
+- **132 directed (66 physical)** `structural_link` edges (10-dim attributes: stiffness coefficients, beta angle)
+- 5 edge types: `belongs_to_beam`, `rev_belongs_to_beam`, `belongs_to_plate`, `rev_belongs_to_plate`, `structural_link`
+
+### Supervised Labels
+
+- `mesh_node.y_disp`: 6-DOF displacement [Dx, Dy, Dz, Rx, Ry, Rz]
+- `beam_element.y_force`: 12-component beam-end force [Fx_I, Fy_I, Fz_I, Mx_I, My_I, Mz_I, Fx_J, Fy_J, Fz_J, Mx_J, My_J, Mz_J]
 
 ### Build the Dataset
 
 ```bash
-# Build v2 heterogeneous dataset
 python src/data/build_hetero_graph_dataset.py --config configs/hetero_dataset.yaml
 ```
 
 ### Validate the Dataset
 
 ```bash
-python src/data/validate_hetero_dataset.py --data-dir processed/hetero_graph_dataset_v2
+python src/data/validate_hetero_graph_dataset.py --data-dir processed/hetero_graph_dataset_v2
 ```
 
-> **Note:** The raw data (`GraphTrainingData2/`) and processed dataset (`processed/`) are large and **not tracked in git**.
-
----
-
-## Reproduction Commands
-
-### 1. Dataset Validation / Smoke Check
+### Quick Sanity Check
 
 ```bash
-# Quick dataset sanity check (local)
 python -c "
 from src.data.hetero_graph_dataset import HeteroGraphDataset
 ds = HeteroGraphDataset('processed/hetero_graph_dataset_v2', max_graphs=2)
@@ -228,139 +196,133 @@ print(f'Edge types: {g.edge_types}')
 "
 ```
 
-### 2. Baseline Training Example (Smoke Test)
+---
+
+## Training
+
+### Baseline Models (Smoke Test — Local CPU)
 
 ```bash
-# MLP smoke test — 2 graphs, 2 epochs (local CPU)
+# MLP smoke test — 2 graphs, 2 epochs
 python train_baseline.py --model mlp_baseline \
     --max-graphs 2 --epochs 2 --batch-size 1 \
     --device cpu --output-root outputs/baselines
 ```
 
-### 3. Full Baseline Training (Server)
+Available baseline models: `mlp_baseline`, `homogeneous_gcn`, `homogeneous_gat`, `hetero_rgcn`, `hgt_baseline`, `ours_base`, `ms_hgt`, `ms_pi_hgt`.
+
+### Full Training (Server)
 
 ```bash
-# Example: HGT (remote_jobs/server_hgt_full.yaml)
 cd /path/to/Multi-Scale-PI-HGNN
 git fetch && git checkout <branch> && git pull
 bash server_ops/check_dataset.sh
 bash server_ops/run_job.sh remote_jobs/server_hgt_full.yaml
 ```
 
-### 4. Full MS-PI-HGT Training (Server)
+Available job configs cover all supported models. Adjust epochs, batch size, and device in the YAML config or via command-line overrides.
+
+### Training Monitor
 
 ```bash
-bash server_ops/run_job.sh remote_jobs/server_ms_pi_hgt_full.yaml
+nvidia-smi
+tail -f logs/remote/<job_name>_<timestamp>.log
 ```
 
-### 5. Prediction Export
+### Resume Training
+
+```bash
+python train.py --resume outputs/<ModelName>/<run_timestamp>/last_model.pt
+```
+
+---
+
+## Evaluation and Diagnostics
+
+### Prediction Export
 
 ```bash
 python scripts/export_full_predictions.py --model mshgt \
-    --run-dir outputs/baselines/MS_HGT/20260626170354 \
+    --run-dir outputs/baselines/MS_HGT/<RUN_DIR> \
     --batch-size 8 --device cuda \
-    --output-dir outputs/predictions/stage6
+    --output-dir outputs/predictions
 ```
 
-### 6. Physics Diagnostics (Stage 5)
+### Physics Diagnostics
 
 ```bash
 python scripts/physics_diagnostics.py \
-    --predictions-dir outputs/predictions/stage5 \
-    --output-dir outputs/diagnostics/stage5_physics
+    --predictions-dir outputs/predictions \
+    --output-dir outputs/diagnostics/physics
 ```
 
-### 7. Conformal UQ (Stage 6)
+### Conformal Uncertainty Quantification
 
 ```bash
-# Compute conformal intervals
+# Compute conformal prediction intervals
 python scripts/compute_conformal.py \
-    --predictions-dir outputs/predictions/stage6/ms_pi_hgt_full_test \
+    --predictions-dir outputs/predictions \
     --split-mode test_graph_50_50 \
     --alpha 0.10 0.05 \
-    --output-dir outputs/diagnostics/stage6_uq
+    --output-dir outputs/diagnostics/conformal
 
-# Analyze and visualize
+# Analyze coverage and interval width
 python scripts/analyze_conformal.py \
-    --conformal-dir outputs/diagnostics/stage6_uq/<timestamp> \
-    --output-dir outputs/diagnostics/stage6_uq/<timestamp>
+    --conformal-dir outputs/diagnostics/conformal/<RUN_DIR> \
+    --output-dir outputs/diagnostics/conformal/<RUN_DIR>
 ```
 
 ---
 
-## Main Results Summary
+## Output Structure
 
-| Method | Graph Type | Typed Message | Multi-Scale | Physics Loss | Disp R² | Dy R² | Force R² | RelMAE | Params |
-|--------|------------|:-------------:|:-----------:|:------------:|:-------:|:-----:|:--------:|:------:|:------:|
-| MLP | none | no | no | no | 0.8554 | 0.1833 | 0.9824 | 0.0884 | 96,274 |
-| GCN | homogeneous | no | no | no | 0.8476 | 0.1778 | 0.9696 | 0.1227 | 76,050 |
-| GAT | homogeneous | no | no | no | 0.8421 | 0.1649 | 0.9632 | 0.1361 | 76,818 |
-| RGCN/HeteroConv | heterogeneous | relation-specific | no | no | 0.9366 | 0.670 | 0.9878 | 0.0724 | 520,338 |
-| HGT | heterogeneous | typed attention | no | no | 0.9765 | 0.905 | 0.9893 | 0.0676 | 744,279 |
-| MS-HGT additive | heterogeneous | typed attention | macro (additive) | no | 0.9950 | 0.993 | 0.9931 | 0.0531 | 844,119 |
-| MS-HGT gated | heterogeneous | typed attention | macro (gated) | no | **0.9952** | 0.993 | 0.9928 | **0.0519** | 893,527 |
-| MS-PI-HGT-BC | heterogeneous | typed attention | macro (gated) | BC only | 0.9951 | 0.993 | 0.9934 | 0.0529 | 893,527 |
-| MS-PI-HGT-Link | heterogeneous | typed attention | macro (gated) | Link only | 0.9952 | **0.993** | 0.9934 | 0.0515 | 893,527 |
-| **MS-PI-HGT-Full** | heterogeneous | typed attention | macro (gated) | BC+Link | 0.9948 | 0.993 | **0.9933** | 0.0516 | **893,527** |
+Training and diagnostic outputs are organized under `outputs/`:
 
-**Stage 6 Conformal UQ (MS-PI-HGT-Full backbone, α=0.10):**
+```
+outputs/
+├── baselines/              # Training checkpoints and logs
+│   ├── MLP/
+│   ├── HGT/
+│   ├── MS_HGT/
+│   └── MS_PI_HGT/
+├── predictions/            # Full test set prediction exports (.npz)
+└── diagnostics/            # Physics and conformal analysis results
+```
 
-| Domain | 90% Coverage | 90% Avg Half-Width* | 95% Coverage | 95% Avg Half-Width* |
-|--------|:-----------:|:-------------:|:-----------:|:-------------:|
-| Displacement (all DOF) | 89.74% | 0.000476 m/rad | 94.78% | 0.000567 m/rad |
-| Force (all components) | 89.97% | 40,136 N/N·m | 94.97% | 69,715 N/N·m |
-| Per-DOF max gap | 0.004 | — | 0.003 | — |
+Each training run produces:
 
-\* Average half-width = conformal quantile $q$ of absolute residual; prediction interval is $[\hat{y} - q, \hat{y} + q]$.
+- `config_resolved.yaml` — Resolved configuration snapshot
+- `model_summary.json` — Model architecture summary
+- `best_model.pt` — Best validation checkpoint
+- `train_log.csv` — Per-epoch training log
+- `metrics_summary.json` — Aggregated evaluation metrics
+- `loss_curve.png` — Training/validation loss plot
+- `metric_curve.png` — Metric evolution plot
+
+---
+
+## Dataset Split
+
+- **Split mode:** `by_sample` (default) — 80/10/10 train/val/test split over the 70 design samples
+- **Alternative:** `by_loadcase` — split over load cases within each sample
+- **Standardization:** Computed from training set only; val/test use training-set statistics
+- **Random seed:** 42 (configurable)
+
+---
 
 ## Reproducibility Notes
 
-1. **Experiments are tracked by git commit + config.** Each server training job records its commit hash, resolved config, and dataset version.
-2. **Smoke test first, then server.** All modifications are tested locally with a small subset (2 graphs, 2 epochs) before full server training.
+1. **Experiments are tracked by git commit + config.** Each training job records its commit hash, resolved config, and dataset version.
+2. **Smoke test first, then full training.** All modifications should be tested locally with a small subset (2 graphs, 2 epochs) before full training.
 3. **Artifacts are archived.** Server training outputs are packaged and downloaded to `remote_artifacts/` for local analysis.
-4. **Files not tracked in git:**
-   - `processed/` — built datasets (large)
-   - `outputs/` — training checkpoints, logs, diagnostics
-   - `remote_artifacts/` — server artifact tarballs
-   - `logs/` — runtime logs
-   - `*.pt`, `*.pth`, `*.ckpt` — model files
-5. **Random seed = 42** across all experiments (configurable).
-6. **Split mode:** `by_sample` (train/val/test = 80/10/10 over 70 design samples) — tests generalization to unseen design samples under the same topology.
-7. **Standardization:** Train-only statistics; val/test use training set stats.
+4. **Files not tracked in git:** `processed/`, `outputs/`, `remote_artifacts/`, `logs/`, and model checkpoints (`*.pt`, `*.pth`, `*.ckpt`).
+5. **All comparisons are internal.** Baseline models (MLP, GCN, GAT, RGCN, HGT) are re-implemented within the same pipeline for fair comparison.
 
----
+### Limitations
 
-## Limitations
-
-1. **Shared topology (by-sample split).** All 70 samples share the same mesh topology. Current results demonstrate generalization to unseen design parameters, **not cross-topology generalization**.
-2. **Physics losses are not complete equilibrium.** The BC and link consistency losses penalize specific violation types but do not enforce full element-level or system-level equilibrium, energy conservation, or constitutive relations.
-3. **Conformal UQ provides marginal coverage for each output component**, not pointwise or simultaneous joint guarantee. Joint coverage (all 6 DOF simultaneously) is significantly lower — this reflects a known limitation of component-wise marginal intervals; simultaneous coverage would require vector-level or graph-level conformal calibration, typically with wider intervals.
-4. **Structural link loss convergence is limited** at the current λ value. The primary benefit of the Full variant comes from combined regularization rather than link loss convergence.
-5. **Plate element outputs are not predicted** — plate force/stress labels are unavailable in the current dataset.
-6. **All comparisons are internal.** Baselines (MLP, GCN, GAT, RGCN, HGT) are re-implemented within the same pipeline for fair comparison, not against external published results on different data.
-
----
-
-## Paper Status
-
-This project is being prepared for submission to **ICTAI 2026** (Tools with Artificial Intelligence). See:
-- [docs/ictai_research_story.md](docs/ictai_research_story.md) — Research narrative and claims
-- [docs/ictai_paper_preparation_summary.md](docs/ictai_paper_preparation_summary.md) — Paper readiness assessment
-
----
-
-## Citation
-
-If you use this code or data in your research, please cite:
-
-```bibtex
-@article{ms_pi_hgt_2026,
-  title={Multi-Scale Physics-Informed Heterogeneous Graph Transformer for Structural Finite Element Surrogate Modeling},
-  author={To be updated},
-  journal={arXiv preprint},
-  year={2026}
-}
-```
+1. **Shared topology (by-sample split).** All 70 samples share the same mesh topology. Current results demonstrate generalization to unseen design parameters, not cross-topology generalization.
+2. **Physics losses are not complete equilibrium.** The BC and link consistency losses penalize specific violation types but do not enforce full element-level or system-level equilibrium.
+3. **Plate element outputs are not predicted** — plate force/stress labels are unavailable in the current dataset.
 
 ---
 
@@ -371,4 +333,4 @@ This project is for research purposes. See LICENSE file for details.
 ## Acknowledgments
 
 - Built with [PyTorch](https://pytorch.org/) and [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/)
-- Inspired by [Graph Neural Networks in Computational Mechanics](https://arxiv.org/abs/2107.12524) and related works
+- Inspired by Graph Neural Networks in Computational Mechanics and related works
