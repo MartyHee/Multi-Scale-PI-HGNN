@@ -1,0 +1,46 @@
+# ============================================================
+# ms_hgt_random_anchor.yaml — Paper-upgrade ablation: random-fixed anchors
+#
+# Purpose:
+#   Coordinate-aligned anchor ablation. MS-HGT gated with anchor assignment
+#   replaced by a seed-controlled FIXED RANDOM partition (same for every
+#   graph, stable across epochs). Answers: is structure-aligned assignment
+#   (coordinate bins along X) necessary, or is any fixed K-partition enough?
+#
+# Everything except anchor_mode/anchor_seed is IDENTICAL to the MS-HGT gated
+# config (configs/models_baseline.yaml -> ms_hgt):
+#   hidden_dim=128, num_layers=3, heads=4, dropout=0.1,
+#   n_segments=12, macro_gnn_layers=2, aggr=mean,
+#   include_anchor_static=true, fusion_method=gated_residual,
+#   fusion_per_layer=true.
+#
+# Loaded via: --model ms_hgt_random_anchor
+#   (MODEL_CONFIG_KEYS['ms_hgt_random_anchor'] = 'ms_hgt_random_anchor',
+#   falls back to this file in load_baseline_configs).
+#
+# Reproducibility:
+#   anchor_seed controls the fixed random partition. Same seed => same
+#   assignment; different seed => different assignment. The partition is
+#   generated once (on CPU) and cached, so it does NOT change per epoch.
+#
+# seed=42 is the first single-seed run (matching prior runs' seed).
+# ============================================================
+
+mesh_feat_dim: 15
+beam_feat_dim: 11
+plate_feat_dim: 6
+hidden_dim: 128
+num_layers: 3
+heads: 4
+dropout: 0.1
+activation: "relu"
+use_layer_norm: true
+decoder_hidden_dims: [64, 32]
+n_segments: 12
+macro_gnn_layers: 2
+macro_gnn_aggr: "mean"
+include_anchor_static: true
+fusion_method: "gated_residual"
+fusion_per_layer: true
+anchor_mode: "random_fixed"
+anchor_seed: 42

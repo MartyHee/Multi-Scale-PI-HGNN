@@ -1,0 +1,36 @@
+# =============================================================================
+# paper_hgt_6_seed3407.yaml — Paper-upgrade multi-seed wave: HGT-6 seed=3407
+#
+# Purpose:
+#   Third training seed for the HGT-6 depth baseline (after 42, 2026).
+#   Complements paper_hgt_6_seed42.yaml / paper_hgt_6_seed2026.yaml.
+#
+# Model config:
+#   --model hgt6 -> configs/paper_upgrade/hgt_6layer.yaml (num_layers=6)
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_hgt_6_seed3407.yaml
+# =============================================================================
+
+model: "hgt6"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 4
+
+seed: 3407
+
+model_config:
+  num_layers: 6
+
+run_name: "paper_hgt_6_seed3407"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

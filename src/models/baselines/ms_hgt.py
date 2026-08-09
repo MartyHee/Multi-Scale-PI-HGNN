@@ -87,16 +87,31 @@ class MacroAnchorPool(nn.Module):
         n_segments: int = 12,
         hidden_dim: int = 128,
         include_static_feats: bool = True,
+        anchor_mode: str = "coordinate",
+        anchor_seed: int = 42,
     ):
         super().__init__()
         self.n_segments = n_segments
         self.include_static_feats = include_static_feats
+        self.anchor_mode = anchor_mode
+        self.anchor_seed = anchor_seed
+
+        if anchor_mode not in ("coordinate", "random_fixed"):
+            raise ValueError(
+                f"Unknown anchor_mode '{anchor_mode}'. "
+                f"Options: 'coordinate', 'random_fixed'."
+            )
 
         if include_static_feats:
             self.static_proj = nn.Linear(hidden_dim + 2, hidden_dim)
 
         # Diagnostics buffers
         self._last_anchor_stats: Dict = {}
+
+        # Fixed random assignment cache (random_fixed mode only).
+        # Computed lazily on first forward, reused across epochs so that
+        # assignment does NOT change per epoch.
+        self._random_assignment: Optional[torch.Tensor] = None
 
     def _build_bin_edges(self, x: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
         """Build ``n_segments+1`` bin edges from ``x`` (per-graph)."""
@@ -109,6 +124,45 @@ class MacroAnchorPool(nn.Module):
             edges = torch.linspace(x_min, x_max,
                                    self.n_segments + 1, device=x.device)
         return edges
+
+    def _get_fixed_random_assignment(
+        self,
+        n_local: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Return a cached fixed-random node→anchor assignment.
+
+        ``random_fixed`` mode: each graph partitions its mesh nodes into
+        ``n_segments`` bins via a **fixed random** assignment controlled by
+        ``anchor_seed``. The assignment is computed once (on CPU, then moved
+        to ``device``) and reused across every forward pass so that it does
+        NOT change per epoch — it is a fixed partition, not per-epoch noise.
+
+        The same deterministic vector is applied to every graph (shared
+        topology ⇒ same node ordering ⇒ same node-index space per graph),
+        which is the intended structure-agnostic control for the
+        coordinate-aligned ablation.
+
+        Args:
+            n_local: number of mesh nodes per graph.
+            device: target device.
+
+        Returns:
+            ``(n_local,)`` int tensor of bin IDs in ``[0, n_segments)``.
+        """
+        cached = self._random_assignment
+        if (
+            cached is None
+            or cached.numel() != n_local
+            or cached.device != device
+        ):
+            # Generate on CPU for cross-device reproducibility, then move.
+            g = torch.Generator(device="cpu").manual_seed(self.anchor_seed)
+            cached = torch.randint(
+                0, self.n_segments, (n_local,), generator=g
+            ).to(device)
+            self._random_assignment = cached
+        return cached
 
     def assign_nodes(
         self,
@@ -126,6 +180,11 @@ class MacroAnchorPool(nn.Module):
             ``(node_assignments, anchor_stats)``
                 - node_assignments: ``(total_mesh_nodes,)`` int — bin ID per node.
                 - anchor_stats: dict with per-graph diagnostics.
+
+        Anchor modes:
+            - ``"coordinate"``: X-axis equal-width geometric bins (default).
+            - ``"random_fixed"``: seed-controlled fixed random partition,
+              identical for every graph, stable across epochs.
         """
         device = coords.device
         B = int(batch_vec.max().item()) + 1
@@ -137,6 +196,13 @@ class MacroAnchorPool(nn.Module):
         empty_segments_total = 0
         total_nodes_accounted = 0
 
+        if self.anchor_mode == "random_fixed":
+            # Per-graph node count is identical across graphs (shared topology).
+            first_mask = (batch_vec == 0)
+            n_per_graph = int(first_mask.sum().item()) if B > 0 else 0
+            if n_per_graph > 0:
+                fixed_bins = self._get_fixed_random_assignment(n_per_graph, device)
+
         for b in range(B):
             mask = (batch_vec == b)
             x_b = coords[mask, 0]
@@ -145,13 +211,16 @@ class MacroAnchorPool(nn.Module):
                 per_graph_counts.append(0)
                 continue
 
-            edges = self._build_bin_edges(x_b)
-            # bucketize with right=False:
-            #   returns 0 if x < edges[0], k if edges[k-1] <= x < edges[k],
-            #   returns n_segments if x >= edges[-1]
-            bins = torch.bucketize(x_b, edges, right=False)
-            # Clamp to [0, n_segments - 1] for safety
-            bins = bins.clamp(0, N_seg - 1)
+            if self.anchor_mode == "random_fixed":
+                bins = fixed_bins  # same fixed random vector for every graph
+            else:
+                edges = self._build_bin_edges(x_b)
+                # bucketize with right=False:
+                #   returns 0 if x < edges[0], k if edges[k-1] <= x < edges[k],
+                #   returns n_segments if x >= edges[-1]
+                bins = torch.bucketize(x_b, edges, right=False)
+                # Clamp to [0, n_segments - 1] for safety
+                bins = bins.clamp(0, N_seg - 1)
 
             node_assignments[mask] = bins
 
@@ -234,9 +303,15 @@ class MacroAnchorPool(nn.Module):
     ) -> torch.Tensor:
         """Compute static features for each anchor segment.
 
+        In ``coordinate`` mode the center feature is the normalized X-center
+        of the segment (structure-aligned). In ``random_fixed`` mode the
+        center feature is the normalized bin index instead of an X-coordinate,
+        so random anchors do NOT receive structure-aligned positional info
+        (keeps the ablation fair).
+
         Returns:
             ``(B * n_segments, 2)`` tensor with
-                [normalized_center_x, log_node_count_plus_one].
+                [center_feature, log_node_count_plus_one].
         """
         device = coords.device
         B = int(batch_vec.max().item()) + 1
@@ -251,13 +326,16 @@ class MacroAnchorPool(nn.Module):
                 static_list.append(empty)
                 continue
 
-            edges = self._build_bin_edges(x_b)
-            x_min, x_max = x_b.min(), x_b.max()
-            x_span = max(x_max - x_min, 1e-6)
-
-            # Centers of each bin
-            centers = (edges[:-1] + edges[1:]) / 2.0
-            normalized_center = (centers - x_min) / x_span
+            if self.anchor_mode == "random_fixed":
+                # Normalized bin index — no coordinate alignment.
+                bin_ids = torch.arange(N_seg, device=device)
+                normalized_center = (bin_ids + 0.5) / N_seg
+            else:
+                edges = self._build_bin_edges(x_b)
+                x_min, x_max = x_b.min(), x_b.max()
+                x_span = max(x_max - x_min, 1e-6)
+                centers = (edges[:-1] + edges[1:]) / 2.0
+                normalized_center = (centers - x_min) / x_span
 
             # Node count per segment
             bins_local = node_assignments[mask]
@@ -503,6 +581,11 @@ class MSHGTBaseline(nn.Module):
         fusion_method: ``"gated_residual"`` or ``"additive"``.
         fusion_per_layer: Apply fusion after every HGT layer (default True).
             If ``False``, fusion is applied only after the last layer.
+        anchor_mode: ``"coordinate"`` (X-axis equal-width bins, default) or
+            ``"random_fixed"`` (seed-controlled fixed random partition, same
+            for every graph, stable across epochs — ablation control).
+        anchor_seed: Seed for the fixed random assignment (used only when
+            ``anchor_mode="random_fixed"``).
     """
 
     def __init__(
@@ -524,6 +607,8 @@ class MSHGTBaseline(nn.Module):
         include_anchor_static: bool = True,
         fusion_method: str = "gated_residual",
         fusion_per_layer: bool = True,
+        anchor_mode: str = "coordinate",
+        anchor_seed: int = 42,
     ):
         super().__init__()
         if decoder_hidden_dims is None:
@@ -541,6 +626,8 @@ class MSHGTBaseline(nn.Module):
         self.n_segments = n_segments
         self.fusion_method = fusion_method
         self.fusion_per_layer = fusion_per_layer
+        self.anchor_mode = anchor_mode
+        self.anchor_seed = anchor_seed
 
         # ---- Type-specific encoders ----
         self.mesh_encoder = nn.Linear(mesh_feat_dim, hidden_dim)
@@ -579,6 +666,8 @@ class MSHGTBaseline(nn.Module):
             n_segments=n_segments,
             hidden_dim=hidden_dim,
             include_static_feats=include_anchor_static,
+            anchor_mode=anchor_mode,
+            anchor_seed=anchor_seed,
         )
 
         self.macro_gnn = MacroGNN(

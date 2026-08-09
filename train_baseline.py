@@ -90,6 +90,10 @@ MODEL_NAMES_MAP = {
     "ours_base_v2": "OursBaselineV2",
     "ms_hgt": "MSHGTBaseline",
     "ms_hgt_additive": "MSHGTBaseline",
+    # ---- Paper-upgrade (Stage Paper-2A) depth / ablation variants ----
+    "hgt6": "HGTBaseline",
+    "hgt9": "HGTBaseline",
+    "ms_hgt_random_anchor": "MSHGTBaseline",
 }
 
 MODEL_CONFIG_KEYS = {
@@ -102,6 +106,10 @@ MODEL_CONFIG_KEYS = {
     "ours_base_v2": "ours_base_v2",
     "ms_hgt": "ms_hgt",
     "ms_hgt_additive": "ms_hgt_additive",
+    # ---- Paper-upgrade configs live in configs/paper_upgrade/ ----
+    "hgt6": "hgt_6layer",
+    "hgt9": "hgt_9layer",
+    "ms_hgt_random_anchor": "ms_hgt_random_anchor",
 }
 
 
@@ -185,7 +193,8 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             use_layer_norm=model_cfg.get("use_layer_norm", True),
             decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
         )
-    elif model_name == "hgt":
+    elif model_name in ("hgt", "hgt6", "hgt9"):
+        # hgt6 / hgt9 are depth variants sharing the same HGTBaseline class.
         model = HGTBaseline(
             mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
             beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
@@ -229,7 +238,7 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             use_edge_bias=model_cfg.get("use_edge_bias", False),
             edge_bias_scale=model_cfg.get("edge_bias_scale", 0.0),
         )
-    elif model_name in ("ms_hgt", "ms_hgt_additive"):
+    elif model_name in ("ms_hgt", "ms_hgt_additive", "ms_hgt_random_anchor"):
         model = MSHGTBaseline(
             mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
             beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
@@ -247,6 +256,8 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             include_anchor_static=model_cfg.get("include_anchor_static", True),
             fusion_method=model_cfg.get("fusion_method", "gated_residual"),
             fusion_per_layer=model_cfg.get("fusion_per_layer", True),
+            anchor_mode=model_cfg.get("anchor_mode", "coordinate"),
+            anchor_seed=model_cfg.get("anchor_seed", 42),
         )
     else:
         raise ValueError(f"Unknown model '{model_name}'. Options: {list(MODEL_NAMES_MAP.keys())}")
@@ -259,7 +270,13 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
 # ============================================================
 
 def load_baseline_configs(config_dir: str, model_name: str) -> Dict:
-    """Load train_baseline.yaml + models_baseline.yaml and merge."""
+    """Load train_baseline.yaml + models_baseline.yaml and merge.
+
+    Model-specific config is resolved from ``models_baseline.yaml`` first;
+    if the key is absent, a per-model file ``<config_dir>/paper_upgrade/
+    <cfg_key>.yaml`` is tried (used by paper-upgrade depth / anchor-ablation
+    variants so they don't pollute the baseline config).
+    """
     config_dir = Path(config_dir)
     train_cfg = _load_yaml(config_dir / "train_baseline.yaml")
     models_cfg = _load_yaml(config_dir / "models_baseline.yaml")
@@ -270,9 +287,16 @@ def load_baseline_configs(config_dir: str, model_name: str) -> Dict:
 
     # Inject model-specific config
     cfg_key = MODEL_CONFIG_KEYS[model_name]
-    model_cfg = models_cfg.get(cfg_key, {})
+    model_cfg = models_cfg.get(cfg_key)
+    if not model_cfg:
+        paper_path = config_dir / "paper_upgrade" / f"{cfg_key}.yaml"
+        if paper_path.is_file():
+            model_cfg = _load_yaml(paper_path)
+        else:
+            model_cfg = {}
     merged["model_config"] = model_cfg
     merged["model_name"] = model_name
+    merged["model_config_key"] = cfg_key
 
     return merged
 
@@ -364,7 +388,10 @@ def save_sample_predictions(
         rows.append(row)
 
     nf = min(max_samples, force_pred.shape[0])
-    for i in range(nf):
+    # Guard: mesh (disp) and beam (force) node counts can differ, and in tiny
+    # smoke runs the force rows may exceed the disp rows. Only write force
+    # columns for row indices that actually exist in `rows`.
+    for i in range(min(nf, n)):
         for j, name in enumerate(FORCE_COMP_NAMES):
             rows[i][f"force_pred_{name}"] = force_pred_orig[i, j].item()
             rows[i][f"force_true_{name}"] = force_target_orig[i, j].item()
@@ -502,6 +529,12 @@ def main(args: argparse.Namespace):
     config.setdefault("train", {})["device"] = str(device)
     if args.run_name:
         config["run_name"] = args.run_name
+    # Seed override (paper-upgrade multi-seed support)
+    if args.seed is not None:
+        config.setdefault("train", {})["seed"] = args.seed
+        if args.run_name:
+            # Keep run name deterministic per seed for traceability.
+            config["run_name"] = f"{args.run_name}_seed{args.seed}"
     # Physics loss lambda overrides
     if args.lambda_bc is not None:
         config["lambda_bc"] = args.lambda_bc
@@ -516,6 +549,7 @@ def main(args: argparse.Namespace):
     # ---- 2. Seed ----
     seed = config.get("train", {}).get("seed", 42)
     set_seed(seed)
+    print(f"  Seed:          {seed}")
 
     # ---- 3. Build datasets ----
     processed_dir = Path(config.get("data", {}).get("processed_dir", "processed/hetero_graph_dataset_v2"))
@@ -779,9 +813,10 @@ def _get_input_construction_desc(model_name: str, model_cfg: Dict) -> str:
             "MLPHead decoders for disp (6) and force (12). "
             "No edge_attr used — this is a standard typed-relation baseline."
         )
-    elif model_name == "hgt":
+    elif model_name in ("hgt", "hgt6", "hgt9"):
+        depth = model_cfg.get("num_layers", 3)
         return (
-            "HGTBaseline: Type-specific Linear projections per node type "
+            f"HGTBaseline ({depth} layers): Type-specific Linear projections per node type "
             "(mesh_node 15-dim, beam_element 11-dim, plate_element 6-dim) to shared "
             "hidden_dim. Typed attention via HGTConv (4 heads) on all 5 edge types. "
             "Per-node-type LayerNorm. MLPHead decoders for disp (6) and force (12). "
@@ -829,6 +864,14 @@ def _get_input_construction_desc(model_name: str, model_cfg: Dict) -> str:
             "instead of gated residual. "
             "Used for ablation comparison: does gating matter?"
         )
+    elif model_name == "ms_hgt_random_anchor":
+        return (
+            "MSHGTBaseline (Multi-Scale HGT) with random_fixed anchor assignment "
+            "(ablation). Same architecture as ms_hgt (gated residual, n_segments=12), "
+            "but anchor assignment is a seed-controlled fixed random partition instead "
+            "of coordinate-aligned X bins. "
+            "Used for ablation comparison: does structure-aligned assignment matter?"
+        )
     return ""
 
 
@@ -862,6 +905,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
                    help="Support BC translation loss weight (default: from config, 0.0)")
     p.add_argument("--lambda-link", type=float, default=None,
                    help="Structural link translation consistency loss weight (default: from config, 0.0)")
+    p.add_argument("--seed", type=int, default=None,
+                   help="Random seed override (paper-upgrade multi-seed; default: from config train.seed)")
     p.add_argument("--summarise-only", action="store_true",
                    help="Only generate summary from existing experiments, no training")
     return p.parse_args(argv)

@@ -53,6 +53,7 @@ DEVICE=$(_yaml_val "device")
 RUN_NAME=$(_yaml_val "run_name")
 LAMBDA_BC=$(_yaml_val "lambda_bc")
 LAMBDA_LINK=$(_yaml_val "lambda_link")
+SEED=$(_yaml_val "seed")
 PACKAGE_ARTIFACT=$(_yaml_val "package_artifact")
 SAVE_BEST=$(_yaml_val "save_best_model")
 SAVE_LAST=$(_yaml_val "save_last_model")
@@ -130,6 +131,7 @@ CMD_EXTRA=""
 [ -n "$RUN_NAME" ] && [ "$RUN_NAME" != "null" ] && CMD_EXTRA="$CMD_EXTRA --run-name $RUN_NAME"
 [ -n "$LAMBDA_BC" ] && [ "$LAMBDA_BC" != "null" ] && CMD_EXTRA="$CMD_EXTRA --lambda-bc $LAMBDA_BC"
 [ -n "$LAMBDA_LINK" ] && [ "$LAMBDA_LINK" != "null" ] && CMD_EXTRA="$CMD_EXTRA --lambda-link $LAMBDA_LINK"
+[ -n "$SEED" ] && [ "$SEED" != "null" ] && CMD_EXTRA="$CMD_EXTRA --seed $SEED"
 
 echo "  Training command:"
 echo "    python train_baseline.py --model ${MODEL} ${CMD_EXTRA}"

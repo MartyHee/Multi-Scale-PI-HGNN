@@ -1,0 +1,48 @@
+# =============================================================================
+# paper_hgt_6_seed42.yaml — Paper-upgrade first wave: HGT-6 depth baseline
+#
+# Purpose:
+#   Deeper HGT control (6 HGTConv layers). Answers whether the MS-HGT
+#   macro-anchor gain is just more local typed-attention depth.
+#
+# Model config:
+#   --model hgt6  ->  MODEL_CONFIG_KEYS['hgt6']='hgt_6layer'
+#   -> falls back to configs/paper_upgrade/hgt_6layer.yaml
+#   (num_layers=6, all other hyper-params identical to HGT-3).
+#
+# Single seed (42), first-wave triage run. Comparable to prior HGT/MS-HGT
+# runs which used seed=42.
+#
+# Memory:
+#   6 HGTConv layers ~2x HGT-3 attention memory. batch_size=4 is a safe
+#   first-wave choice; if memory permits, can raise to 8 in a later seed run.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_hgt_6_seed42.yaml
+# =============================================================================
+
+model: "hgt6"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 4
+
+# Multi-seed control (forwarded by run_job.sh -> train_baseline.py --seed)
+seed: 42
+
+# Model config overrides (documentation-only for run_job.sh; the authoritative
+# hyper-params live in configs/paper_upgrade/hgt_6layer.yaml)
+model_config:
+  num_layers: 6
+
+run_name: "paper_hgt_6_seed42"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

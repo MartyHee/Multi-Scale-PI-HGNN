@@ -1,0 +1,45 @@
+# =============================================================================
+# paper_hgt_9_seed42.yaml — Paper-upgrade first wave: HGT-9 depth baseline
+#
+# Purpose:
+#   Deeper HGT control (9 HGTConv layers). Tests whether local depth
+#   approaching/exceeding macro-anchor cost can replace the macro-anchor
+#   channel.
+#
+# Model config:
+#   --model hgt9  ->  MODEL_CONFIG_KEYS['hgt9']='hgt_9layer'
+#   -> falls back to configs/paper_upgrade/hgt_9layer.yaml
+#   (num_layers=9, all other hyper-params identical to HGT-3).
+#
+# Single seed (42), first-wave triage run.
+#
+# Memory:
+#   9 HGTConv layers ~3x HGT-3 attention cost. batch_size=4 is a safe
+#   first-wave choice; if OOM, reduce further (do NOT change model hyper-params).
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_hgt_9_seed42.yaml
+# =============================================================================
+
+model: "hgt9"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 4
+
+seed: 42
+
+model_config:
+  num_layers: 9
+
+run_name: "paper_hgt_9_seed42"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

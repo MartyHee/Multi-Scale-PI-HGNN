@@ -1,0 +1,52 @@
+# =============================================================================
+# paper_ms_hgt_random_anchor_seed42.yaml — Paper-upgrade first wave:
+#   MS-HGT with random-fixed anchors (coordinate vs random ablation)
+#
+# Purpose:
+#   Structure-aligned ablation. MS-HGT gated with anchor assignment replaced
+#   by a seed-controlled FIXED RANDOM partition (same for every graph, stable
+#   across epochs). Answers: is coordinate-aligned anchor assignment
+#   necessary, or is any fixed K-partition enough?
+#
+# Model config:
+#   --model ms_hgt_random_anchor
+#   -> MODEL_CONFIG_KEYS['ms_hgt_random_anchor']='ms_hgt_random_anchor'
+#   -> falls back to configs/paper_upgrade/ms_hgt_random_anchor.yaml
+#   (anchor_mode=random_fixed, anchor_seed=42, everything else identical to
+#   MS-HGT gated).
+#
+# NOTE: anchor_seed and training seed are BOTH 42 here. This is intentional:
+#   anchor_seed controls the fixed random partition; --seed controls RNG.
+#   For the seed3407 variant, anchor_seed stays 42 so the PARTITION is
+#   identical across training seeds (only training RNG varies) — otherwise the
+#   random-anchor ablation would conflate partition noise with seed noise.
+#
+# Single seed (42), first-wave triage run. batch_size=8 matches MS-HGT gated.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_ms_hgt_random_anchor_seed42.yaml
+# =============================================================================
+
+model: "ms_hgt_random_anchor"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 8
+
+seed: 42
+
+model_config:
+  anchor_mode: "random_fixed"
+  anchor_seed: 42
+
+run_name: "paper_ms_hgt_random_anchor_seed42"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

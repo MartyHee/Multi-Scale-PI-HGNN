@@ -1,0 +1,39 @@
+# =============================================================================
+# paper_ms_hgt_gated_seed2026.yaml — Paper-upgrade multi-seed wave:
+#   MS-HGT gated seed=2026
+#
+# Purpose:
+#   Second training seed for the main model (MS-HGT gated, coordinate anchors).
+#   Part of the 3-seed (42 / 2026 / 3407) statistical-stability run. seed42
+#   MS-HGT gated already exists in prior runs.
+#
+# Model config:
+#   --model ms_hgt  ->  configs/models_baseline.yaml -> ms_hgt (gated_residual,
+#   per_layer=true, n_segments=12, macro_gnn_layers=2, anchor_mode default
+#   coordinate).
+#
+# batch_size=8 matches the MS-HGT gated reference run.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_ms_hgt_gated_seed2026.yaml
+# =============================================================================
+
+model: "ms_hgt"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 8
+
+seed: 2026
+
+run_name: "paper_ms_hgt_gated_seed2026"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

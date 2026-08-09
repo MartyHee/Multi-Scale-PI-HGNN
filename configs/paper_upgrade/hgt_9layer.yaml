@@ -1,0 +1,29 @@
+# ============================================================
+# hgt_9layer.yaml — Paper-upgrade depth baseline: HGT-9
+#
+# Purpose:
+#   Deeper HGT control, same spirit as HGT-6 but 9 HGTConv layers.
+#   Tests whether local depth approaching/exceeding macro-anchor cost
+#   can replace the macro-anchor channel.
+#
+# Everything except num_layers is IDENTICAL to the HGT-3 baseline
+# config (configs/models_baseline.yaml -> hgt).
+#
+# Loaded via: --model hgt9  (MODEL_CONFIG_KEYS['hgt9'] = 'hgt_9layer',
+# falls back to this file in load_baseline_configs).
+#
+# Memory note:
+#   num_layers=9 is ~3x the HGT-3 attention cost; if OOM on 8x RTX 4090,
+#   reduce batch_size to 4 for the official run (record it in the job yaml).
+# ============================================================
+
+mesh_feat_dim: 15
+beam_feat_dim: 11
+plate_feat_dim: 6
+hidden_dim: 128
+num_layers: 9
+heads: 4
+dropout: 0.1
+activation: "relu"
+use_layer_norm: true
+decoder_hidden_dims: [64, 32]

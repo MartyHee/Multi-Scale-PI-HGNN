@@ -1,0 +1,32 @@
+# ============================================================
+# hgt_6layer.yaml — Paper-upgrade depth baseline: HGT-6
+#
+# Purpose:
+#   Deeper HGT control. Answers: is the MS-HGT macro-anchor gain just
+#   more local typed-attention depth? 6 HGTConv layers.
+#
+# Everything except num_layers is IDENTICAL to the HGT-3 baseline
+# config (configs/models_baseline.yaml -> hgt):
+#   hidden_dim=128, heads=4, dropout=0.1, use_layer_norm=true,
+#   decoder [64, 32], relu.
+#
+# Loaded via: --model hgt6  (MODEL_CONFIG_KEYS['hgt6'] = 'hgt_6layer',
+# falls back to this file in load_baseline_configs).
+#
+# Memory note:
+#   HGT-200ep (num_layers=3) ran batch_size=8 on the GPU server.
+#   num_layers=6 roughly doubles HGTConv attention memory vs 3 layers;
+#   if OOM on 8x RTX 4090, reduce batch_size to 4 (do NOT change this
+#   file's hyper-params for the official run).
+# ============================================================
+
+mesh_feat_dim: 15
+beam_feat_dim: 11
+plate_feat_dim: 6
+hidden_dim: 128
+num_layers: 6
+heads: 4
+dropout: 0.1
+activation: "relu"
+use_layer_norm: true
+decoder_hidden_dims: [64, 32]
