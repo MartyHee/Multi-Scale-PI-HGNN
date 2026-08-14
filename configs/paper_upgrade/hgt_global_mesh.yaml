@@ -1,0 +1,39 @@
+# ============================================================
+# hgt_global_mesh.yaml — Paper-upgrade: HGT + global/virtual node (mesh_global)
+#
+# Purpose:
+#   Baseline to test "is the MS-HGT macro-anchor gain just a global shortcut?".
+#   HGT-3 backbone with ONE per-graph global state (mean-pooled from mesh_node,
+#   GRUCell-updated, broadcast back to mesh_node each layer). beam/plate do NOT
+#   receive the global broadcast.
+#
+# Everything except the global-node fields is IDENTICAL to the HGT-3 baseline
+# (configs/models_baseline.yaml -> hgt): hidden_dim=128, num_layers=3, heads=4,
+# dropout=0.1, use_layer_norm=true, decoder [64, 32], relu.
+#
+# global_mode: "mesh_global" only in v1. "all_node_global" is designed but not
+#   implemented (raises ValueError) — see docs/paper_upgrade_global_node_design.md.
+# global_fusion: "gated_residual" (default, mirrors MS-HGT fusion) or "additive".
+#
+# Loaded via: --model hgt_global
+#   (MODEL_CONFIG_KEYS['hgt_global'] = 'hgt_global_mesh',
+#   falls back to this file in load_baseline_configs).
+#
+# Memory note:
+#   One GRUCell + broadcast Linear add ~100k params vs HGT-3. batch_size=8
+#   should hold; if OOM reduce to 4 (do NOT change model hyper-params).
+# ============================================================
+
+mesh_feat_dim: 15
+beam_feat_dim: 11
+plate_feat_dim: 6
+hidden_dim: 128
+num_layers: 3
+heads: 4
+dropout: 0.1
+activation: "relu"
+use_layer_norm: true
+decoder_hidden_dims: [64, 32]
+use_global_node: true
+global_mode: "mesh_global"
+global_fusion: "gated_residual"

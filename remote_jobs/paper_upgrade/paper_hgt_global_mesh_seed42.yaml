@@ -1,0 +1,45 @@
+# =============================================================================
+# paper_hgt_global_mesh_seed42.yaml — Paper-upgrade second wave:
+#   HGT + global/virtual node (mesh_global), seed 42
+#
+# Purpose:
+#   Baseline for "is the MS-HGT macro-anchor gain just a global shortcut?".
+#   One per-graph global state pooled from mesh_node, GRUCell-updated, broadcast
+#   back to mesh_node each layer (beam/plate excluded). HGT-3 backbone otherwise
+#   identical to the HGT baseline.
+#
+# Model config:
+#   --model hgt_global -> configs/paper_upgrade/hgt_global_mesh.yaml
+#   (global_mode=mesh_global, global_fusion=gated_residual, num_layers=3,
+#   hidden_dim=128, heads=4, dropout=0.1).
+#
+# Single seed (42), second-wave triage run. batch_size=8 matches HGT-3/MS-HGT.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_hgt_global_mesh_seed42.yaml
+# =============================================================================
+
+model: "hgt_global"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 8
+
+seed: 42
+
+model_config:
+  global_mode: "mesh_global"
+  global_fusion: "gated_residual"
+  num_layers: 3
+
+run_name: "paper_hgt_global_mesh_seed42"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

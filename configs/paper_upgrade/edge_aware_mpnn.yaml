@@ -1,0 +1,43 @@
+# ============================================================
+# edge_aware_mpnn.yaml — Paper-upgrade: Edge-aware MPNN (MeshGraphNet-style)
+#
+# Purpose:
+#   Modern neural-simulator-style baseline. Heterogeneous, typed-message version
+#   inspired by MeshGraphNets / GNS (NOT a full reproduction).
+#
+#   Architecture: type-specific node encoders -> per-relation message MLPs
+#   (5 types, shared across layers) -> residual node update -> dual decoders.
+#   structural_link messages include the 10-dim edge_attr encoding.
+#
+# hyper-params matched to HGT-3/MS-HGT where they exist:
+#   hidden_dim=128, dropout=0.1, activation=relu, use_layer_norm=true,
+#   decoder_hidden_dims=[64,32].
+#
+# num_layers=6 processor blocks is the recommended default (range 4-6 in the
+#   design doc). Message/update MLPs are SHARED across layers, so depth adds
+#   compute, not parameters (~450k total, lower than MS-HGT's 893k).
+#
+# Loaded via: --model edge_aware_mpnn
+#   (MODEL_CONFIG_KEYS['edge_aware_mpnn'] = 'edge_aware_mpnn',
+#   falls back to this file in load_baseline_configs).
+#
+# Memory note:
+#   Message passing is cheaper than typed attention; batch_size=8 should hold.
+#   If OOM on small GPUs, reduce to 4 (do NOT change model hyper-params).
+# ============================================================
+
+mesh_feat_dim: 15
+beam_feat_dim: 11
+plate_feat_dim: 6
+hidden_dim: 128
+num_layers: 6
+dropout: 0.1
+activation: "relu"
+use_layer_norm: true
+decoder_hidden_dims: [64, 32]
+structural_edge_dim: 10
+edge_hidden_dim: 32
+use_edge_attr: true
+use_type_embedding: true
+aggr: "sum"
+residual: true

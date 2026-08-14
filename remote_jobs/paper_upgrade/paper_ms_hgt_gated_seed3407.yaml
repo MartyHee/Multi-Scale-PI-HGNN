@@ -1,0 +1,43 @@
+# =============================================================================
+# paper_ms_hgt_gated_seed3407.yaml — Paper-upgrade Stage Paper-3B:
+#   MS-HGT gated (coordinate anchors) seed=3407
+#
+# Purpose:
+#   Third training seed for the main model (MS-HGT gated, coordinate anchors).
+#   Keeps the coordinate side of the coordinate-vs-random 3-seed comparison
+#   symmetric with the random-anchor side:
+#     - coordinate: seed42 (historical) / seed2026 (first wave) / seed3407 (this)
+#     - random:     seed42 (first wave) / seed2026 (new) / seed3407 (run set)
+#
+# Model config:
+#   --model ms_hgt  ->  configs/models_baseline.yaml -> ms_hgt (gated_residual,
+#   per_layer=true, n_segments=12, macro_gnn_layers=2, anchor_mode default
+#   coordinate).
+#
+# batch_size=8 matches the MS-HGT gated reference run. run_name records the
+# training seed and train_baseline.py appends _seed3407, so job name / run_name /
+# config_resolved all record the seed.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_ms_hgt_gated_seed3407.yaml
+# =============================================================================
+
+model: "ms_hgt"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 8
+
+seed: 3407
+
+run_name: "paper_ms_hgt_gated_seed3407"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

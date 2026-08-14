@@ -1,0 +1,39 @@
+# =============================================================================
+# paper_hgt_global_mesh_seed3407.yaml — Paper-upgrade second wave:
+#   HGT + global/virtual node (mesh_global), seed 3407
+#
+# Purpose:
+#   Third training seed for the global-node baseline. Part of the 3-seed
+#   (42 / 2026 / 3407) statistical-stability run.
+#
+# Model config:
+#   --model hgt_global -> configs/paper_upgrade/hgt_global_mesh.yaml
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_hgt_global_mesh_seed3407.yaml
+# =============================================================================
+
+model: "hgt_global"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 8
+
+seed: 3407
+
+model_config:
+  global_mode: "mesh_global"
+  global_fusion: "gated_residual"
+  num_layers: 3
+
+run_name: "paper_hgt_global_mesh_seed3407"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

@@ -1,0 +1,46 @@
+# =============================================================================
+# paper_edge_aware_mpnn_seed42.yaml — Paper-upgrade second wave:
+#   Edge-aware MPNN (MeshGraphNet-style), seed 42
+#
+# Purpose:
+#   Modern neural-simulator-style baseline. Heterogeneous typed-message version
+#   inspired by MeshGraphNets/GNS (NOT a full reproduction). Responds to the
+#   "only old baselines compared" reviewer concern.
+#
+# Model config:
+#   --model edge_aware_mpnn -> configs/paper_upgrade/edge_aware_mpnn.yaml
+#   (hidden_dim=128, num_layers=6, dropout=0.1, use_edge_attr=true,
+#   use_type_embedding=true, aggr=sum, structural_edge_dim=10).
+#
+# Single seed (42), second-wave triage run. batch_size=8 matches HGT-3/MS-HGT.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_edge_aware_mpnn_seed42.yaml
+# =============================================================================
+
+model: "edge_aware_mpnn"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 8
+
+seed: 42
+
+model_config:
+  hidden_dim: 128
+  num_layers: 6
+  use_edge_attr: true
+  use_type_embedding: true
+  aggr: "sum"
+
+run_name: "paper_edge_aware_mpnn_seed42"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true

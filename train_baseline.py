@@ -64,6 +64,8 @@ from src.models.baselines import (
     OursBaseline,
     OursBaselineV2,
     MSHGTBaseline,
+    HGTGlobalBaseline,
+    EdgeAwareMPNNBaseline,
 )
 from src.trainers.baseline_trainer import BaselineTrainer
 from src.utils.experiment import create_experiment_dir, save_resolved_config
@@ -94,6 +96,9 @@ MODEL_NAMES_MAP = {
     "hgt6": "HGTBaseline",
     "hgt9": "HGTBaseline",
     "ms_hgt_random_anchor": "MSHGTBaseline",
+    # ---- Paper-upgrade (Stage Paper-2B) modern baselines ----
+    "hgt_global": "HGTGlobalBaseline",
+    "edge_aware_mpnn": "EdgeAwareMPNNBaseline",
 }
 
 MODEL_CONFIG_KEYS = {
@@ -110,6 +115,8 @@ MODEL_CONFIG_KEYS = {
     "hgt6": "hgt_6layer",
     "hgt9": "hgt_9layer",
     "ms_hgt_random_anchor": "ms_hgt_random_anchor",
+    "hgt_global": "hgt_global_mesh",
+    "edge_aware_mpnn": "edge_aware_mpnn",
 }
 
 
@@ -258,6 +265,41 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             fusion_per_layer=model_cfg.get("fusion_per_layer", True),
             anchor_mode=model_cfg.get("anchor_mode", "coordinate"),
             anchor_seed=model_cfg.get("anchor_seed", 42),
+        )
+    elif model_name == "hgt_global":
+        # HGT + global / virtual node (mesh_global only in v1).
+        model = HGTGlobalBaseline(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 3),
+            heads=model_cfg.get("heads", 4),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+            global_mode=model_cfg.get("global_mode", "mesh_global"),
+            global_fusion=model_cfg.get("global_fusion", "gated_residual"),
+        )
+    elif model_name == "edge_aware_mpnn":
+        # Edge-aware MPNN (MeshGraphNet-style) — heterogeneous neural simulator.
+        model = EdgeAwareMPNNBaseline(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 6),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+            structural_edge_dim=model_cfg.get("structural_edge_dim", 10),
+            edge_hidden_dim=model_cfg.get("edge_hidden_dim", 32),
+            use_edge_attr=model_cfg.get("use_edge_attr", True),
+            use_type_embedding=model_cfg.get("use_type_embedding", True),
+            aggr=model_cfg.get("aggr", "sum"),
+            residual=model_cfg.get("residual", True),
         )
     else:
         raise ValueError(f"Unknown model '{model_name}'. Options: {list(MODEL_NAMES_MAP.keys())}")
@@ -871,6 +913,32 @@ def _get_input_construction_desc(model_name: str, model_cfg: Dict) -> str:
             "but anchor assignment is a seed-controlled fixed random partition instead "
             "of coordinate-aligned X bins. "
             "Used for ablation comparison: does structure-aligned assignment matter?"
+        )
+    elif model_name == "hgt_global":
+        mode = model_cfg.get("global_mode", "mesh_global")
+        fusion = model_cfg.get("global_fusion", "gated_residual")
+        return (
+            f"HGTGlobalBaseline ({model_cfg.get('num_layers', 3)} layers, "
+            f"global_mode={mode}, global_fusion={fusion}): Type-specific Linear "
+            "projections per node type to shared hidden_dim. HGTConv typed attention "
+            "on 5 edge types. After each layer, a per-graph global (virtual) state is "
+            "mean-pooled from mesh_node hidden states, updated with a GRUCell, and "
+            f"broadcast back to mesh_node via {fusion} fusion. beam/plate do NOT "
+            "receive the global broadcast. MLPHead decoders for disp (6) and force (12). "
+            "No macro anchor, no schema change. "
+            "Baseline to test: is macro-anchor just a global shortcut?"
+        )
+    elif model_name == "edge_aware_mpnn":
+        return (
+            f"EdgeAwareMPNNBaseline (MeshGraphNet-style, {model_cfg.get('num_layers', 6)} "
+            "processor blocks, hidden_dim=128): Type-specific node encoders "
+            "(mesh 15-dim, beam 11-dim, plate 6-dim) to shared hidden_dim. "
+            "Per-relation message MLPs (5 types, shared across layers); structural_link "
+            "messages include 10-dim edge_attr encoding. Residual node update "
+            "(x + MLP([x, agg])) with per-node-type LayerNorm. "
+            "MLPHead dual decoders for disp (6) and force (12). "
+            "Adapted heterogeneous version inspired by MeshGraphNets/GNS — not a full "
+            "reproduction."
         )
     return ""
 

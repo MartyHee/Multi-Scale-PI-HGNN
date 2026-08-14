@@ -1,0 +1,55 @@
+# =============================================================================
+# paper_ms_hgt_random_anchor_seed2026.yaml — Paper-upgrade Stage Paper-3B:
+#   MS-HGT random-fixed anchors seed=2026
+#
+# Purpose:
+#   Second training seed for the random-anchor ablation (after 42).
+#   Completes the coordinate-vs-random 3-seed comparison together with:
+#     - paper_ms_hgt_random_anchor_seed42.yaml   (ran, first wave)
+#     - paper_ms_hgt_random_anchor_seed3407.yaml (Stage Paper-3B run set)
+#     - coordinate side: paper_ms_hgt_gated_seed42 (historical) /
+#       paper_ms_hgt_gated_seed2026 (first wave) /
+#       paper_ms_hgt_gated_seed3407 (new, this stage)
+#
+# IMPORTANT (design choice, identical to the seed42/seed3407 files):
+#   anchor_seed STAYS 42 even though the training seed is 2026. The fixed
+#   random partition must be IDENTICAL across all training seeds so that the
+#   coordinate-vs-random ablation isolates the ASSIGNMENT, not partition noise.
+#   Only training RNG varies with --seed.
+#
+# Model config:
+#   --model ms_hgt_random_anchor -> configs/paper_upgrade/ms_hgt_random_anchor.yaml
+#   (anchor_mode=random_fixed, anchor_seed=42; everything else identical to
+#   MS-HGT gated).
+#
+# batch_size=8 matches MS-HGT gated. run_name records the training seed and
+# train_baseline.py appends _seed2026, so job name / run_name / config_resolved
+# all record the seed.
+#
+# Run with:
+#   bash server_ops/run_job.sh remote_jobs/paper_upgrade/paper_ms_hgt_random_anchor_seed2026.yaml
+# =============================================================================
+
+model: "ms_hgt_random_anchor"
+
+dataset: "processed/hetero_graph_dataset_v2"
+split_mode: "by_sample"
+
+device: "cuda"
+num_workers: 4
+
+epochs: 200
+batch_size: 8
+
+seed: 2026
+
+model_config:
+  anchor_mode: "random_fixed"
+  anchor_seed: 42
+
+run_name: "paper_ms_hgt_random_anchor_seed2026"
+
+save_best_model: true
+save_last_model: true
+
+package_artifact: true
