@@ -63,6 +63,8 @@ from src.models.baselines import (
     OursBaseline,
     OursBaselineV2,
     MSHGTBaseline,
+    HGTGlobalBaseline,
+    EdgeAwareMPNNBaseline,
 )
 from src.utils.metrics import compute_all_metrics
 
@@ -86,6 +88,9 @@ MODEL_NAMES_MAP = {
     "ours_base_v2": "OursBaselineV2",
     "ms_hgt": "MSHGTBaseline",
     "ms_hgt_additive": "MSHGTBaseline",
+    "ms_hgt_random_anchor": "MSHGTBaseline",
+    "hgt_global": "HGTGlobalBaseline",
+    "edge_aware_mpnn": "EdgeAwareMPNNBaseline",
 }
 
 MODEL_CONFIG_KEYS = {
@@ -98,6 +103,9 @@ MODEL_CONFIG_KEYS = {
     "ours_base_v2": "ours_base_v2",
     "ms_hgt": "ms_hgt",
     "ms_hgt_additive": "ms_hgt_additive",
+    "ms_hgt_random_anchor": "ms_hgt_random_anchor",
+    "hgt_global": "hgt_global_mesh",
+    "edge_aware_mpnn": "edge_aware_mpnn",
 }
 
 # ---------------------------------------------------------------------------
@@ -233,7 +241,7 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             use_edge_bias=model_cfg.get("use_edge_bias", False),
             edge_bias_scale=model_cfg.get("edge_bias_scale", 0.0),
         )
-    elif model_name in ("ms_hgt", "ms_hgt_additive"):
+    elif model_name in ("ms_hgt", "ms_hgt_additive", "ms_hgt_random_anchor"):
         model = MSHGTBaseline(
             mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
             beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
@@ -251,6 +259,43 @@ def build_model(model_name: str, model_cfg: Dict, device: torch.device) -> torch
             include_anchor_static=model_cfg.get("include_anchor_static", True),
             fusion_method=model_cfg.get("fusion_method", "gated_residual"),
             fusion_per_layer=model_cfg.get("fusion_per_layer", True),
+            anchor_mode=model_cfg.get("anchor_mode", "coordinate"),
+            anchor_seed=model_cfg.get("anchor_seed", 42),
+        )
+    elif model_name == "hgt_global":
+        # HGT + global / virtual node (mesh_global only in v1).
+        model = HGTGlobalBaseline(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 3),
+            heads=model_cfg.get("heads", 4),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+            global_mode=model_cfg.get("global_mode", "mesh_global"),
+            global_fusion=model_cfg.get("global_fusion", "gated_residual"),
+        )
+    elif model_name == "edge_aware_mpnn":
+        # Edge-aware MPNN (MeshGraphNet-style) — heterogeneous neural simulator.
+        model = EdgeAwareMPNNBaseline(
+            mesh_feat_dim=model_cfg.get("mesh_feat_dim", 15),
+            beam_feat_dim=model_cfg.get("beam_feat_dim", 11),
+            plate_feat_dim=model_cfg.get("plate_feat_dim", 6),
+            hidden_dim=model_cfg.get("hidden_dim", 128),
+            num_layers=model_cfg.get("num_layers", 6),
+            dropout=model_cfg.get("dropout", 0.1),
+            activation=model_cfg.get("activation", "relu"),
+            use_layer_norm=model_cfg.get("use_layer_norm", True),
+            decoder_hidden_dims=model_cfg.get("decoder_hidden_dims", [64, 32]),
+            structural_edge_dim=model_cfg.get("structural_edge_dim", 10),
+            edge_hidden_dim=model_cfg.get("edge_hidden_dim", 32),
+            use_edge_attr=model_cfg.get("use_edge_attr", True),
+            use_type_embedding=model_cfg.get("use_type_embedding", True),
+            aggr=model_cfg.get("aggr", "sum"),
+            residual=model_cfg.get("residual", True),
         )
     else:
         raise ValueError(f"Unknown model '{model_name}'. Options: {list(MODEL_NAMES_MAP.keys())}")
