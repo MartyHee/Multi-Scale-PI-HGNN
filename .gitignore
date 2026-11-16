@@ -215,6 +215,7 @@ __marimo__/
 /paper/
 /references/
 /outputs/figures/
+/scripts/paper*
 
 # Local backup and cleanup artifacts
 /local_backups/
