@@ -1,4 +1,6 @@
-# 服务器首批任务（run_job.sh + YAML，无需 export）
+# 服务器任务（run_job.sh + YAML，无需 export）
+
+> 2026-11-18：首批 8 个运行已完成；第二批 `sb_20261118_01`（6 模型 × 3 seed）使用同一接口，任务清单见 `remote_jobs/three_topology_v2/manifests/sb_20261118_01.json`。预检/监控/汇总/回收已改为**冻结清单驱动**；详细命令见 `S1/docs/second_batch_preparation_20261118/server_ops.md`。
 
 新接口：
 ```bash
@@ -12,11 +14,15 @@ CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_v2/run_job.sh remote_j
 ## 1. 一次配置
 ```bash
 cd /home/miniconda/Bishe/Multi-Scale-PI-HGNN
-cp server_ops/three_topology_v2/server_config.example.sh server_ops/three_topology_v2/server_config.sh
+if [ ! -f server_ops/three_topology_v2/server_config.sh ]; then
+  cp server_ops/three_topology_v2/server_config.example.sh server_ops/three_topology_v2/server_config.sh
+fi
 # 编辑 DATA_ROOT / PYTHON / THREADS（server_config.sh 已 gitignore，git pull 不覆盖）
 # 已知：PYTHON=/home/miniconda/miniconda3/envs/pi_hgnn/bin/python
 #       DATA_ROOT=/home/miniconda/Bishe/data/three_topology_graph_v1
 bash server_ops/three_topology_v2/check_config.sh remote_jobs/three_topology_v2/mlp.yaml
+# 确认 job YAML 与冻结批次清单一致
+python server_ops/three_topology_v2/_batch_manifest.py --job remote_jobs/three_topology_v2/mlp.yaml --verify
 ```
 
 ## 2. 依赖检查 / 补装（按检查结果）
@@ -29,7 +35,7 @@ CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_v2/check_config.sh rem
 ```bash
 CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_v2/preflight.sh remote_jobs/three_topology_v2/mlp.yaml
 ```
-依赖 + 数据哈希 + MLP/HGT 1-batch CUDA 训练/验证/best 导出；写 `outputs/three_topology_v2/preflight/<batch>/PREFLIGHT_PASS.json`。缺失时 `run_job.sh` 退出 4 并提示该命令。
+依赖 + 数据哈希 + 本批**所有梯度模型**各 1-batch CUDA 训练/验证/best 导出；只接受仓库内注册 YAML。PASS 绑定 samples/manifest/split/stats/train_config/**v2 batch manifest**/code commit；缺失或任一身份漂移时 `run_job.sh` 退出 4 并提示重跑。
 
 ## 4. 四个终端各一条（共同 batch_id 已在 YAML 中一致）
 ```bash
@@ -66,13 +72,16 @@ tasks:
 YAML
 CUDA_VISIBLE_DEVICES=<gpuB> bash server_ops/three_topology_v2/run_job.sh /tmp/resume.yaml
 ```
-身份校验；无新最佳导出历史 best；缺 best 报错。
+- 只允许**仓库外** resume YAML；`_resume_check.py` 校验 batch/protocol/split/fold、原任务唯一性、checkpoint identity、新 worker 与目标目录。
+- 原失败任务保持只读；恢复 run 是额外目录，`summarize` 仍把原任务计为 failed，**不自动替代、不宣称 18/18**。
+- 记录 `resume_checks/<batch>/<time>_<job>.json/.tsv`，新 run 的 TASK/STATUS 含 `resume_of_worker`/`resume_of_run`。
+- 身份校验；无新最佳导出历史 best；缺 best 报错。
 
 ## 7. 打包
 ```bash
 bash server_ops/three_topology_v2/collect_artifacts.sh remote_jobs/three_topology_v2/mlp.yaml
 ```
-只打包本批次；`SHA256SUMS` 排除自身；done 任务缺必要文件即失败。
+默认输出到 `$PROJECT_ROOT/remote_artifacts/batch_<batch_id>_artifacts.tar.gz`（自动建父目录）；`OUT_TAR=<path>` 可覆盖；**目标已存在时拒绝覆盖**（退出 3）。只打包冻结清单中的任务，包内含 `manifests/batch_manifest.json` 与 `TASKS.tsv`；额外 run 目录单列 `EXTRA_RUN_DIRS.txt`；`SHA256SUMS` 排除自身；done 任务缺必要文件即失败（退出非 0）。`remote_artifacts/` 已 gitignore。
 
 ## 8. terminal1..4 兼容包装
 `terminal1..4.sh` 仅作为**兼容包装**，内部 `exec run_job.sh <对应 yaml>`，要求调用方已设置 `CUDA_VISIBLE_DEVICES`。它们与 run_job 共用同一 YAML/config，不会产生两套结果。**推荐直接用 run_job.sh**。

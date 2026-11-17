@@ -1,24 +1,63 @@
 #!/usr/bin/env bash
-# Server preflight. Usage:
+# Server preflight for ONE batch (task list read from the frozen batch manifest).
+# Usage:
 #   CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_v2/preflight.sh <job.yaml|BATCH_ID>
-# Uses the caller's CUDA_VISIBLE_DEVICES (does NOT set/expand it); runs deps +
-# data hash + MLP/HGT 1-batch CUDA train/val/best-export on cuda:0; writes
-# outputs/three_topology_v2/preflight/<batch>/PREFLIGHT_PASS.json. No 4-GPU check.
+# Uses the caller's CUDA_VISIBLE_DEVICES (never sets/expands it). Runs deps +
+# data hash + 1-batch CUDA train/val/best-export for every gradient model of the
+# batch on cuda:0, then writes a PASS record binding code commit, data, split,
+# stats, train config and the batch manifest. Any later drift invalidates it.
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_load_config.sh"
 
 [ $# -ge 1 ] || { echo "Usage: CUDA_VISIBLE_DEVICES=<gpu> bash $0 <job.yaml|BATCH_ID>" >&2; exit 2; }
 ARG="$1"
+JOB_YAML=""
 case "$ARG" in
   *.yaml|*.yml)
-    eval "$("$PYTHON" -B "$THREE_TOPO_HERE/_job_parse.py" --shell "$ARG")" || exit 2
+    REGISTERED=$("$PYTHON" -c 'import pathlib,sys; j=pathlib.Path(sys.argv[1]).resolve(); r=(pathlib.Path(sys.argv[2])/"remote_jobs"/"three_topology_v2").resolve(); print(1 if j.is_relative_to(r) else 0)' "$ARG" "$PROJECT_ROOT") || {
+      echo "[preflight] cannot resolve job path" >&2; exit 2; }
+    if [ "$REGISTERED" != "1" ]; then
+      echo "[preflight] preflight requires a registered batch YAML, not an external/resume YAML" >&2; exit 2
+    fi
+    HDR=$("$PYTHON" -B "$THREE_TOPO_HERE/_job_parse.py" --shell "$ARG") || {
+      echo "[preflight] invalid job yaml: $ARG" >&2; exit 2; }
+    [ -n "$HDR" ] || { echo "[preflight] job parser produced no header" >&2; exit 2; }
+    eval "$HDR" || { echo "[preflight] cannot apply job header" >&2; exit 2; }
+    JOB_YAML="$ARG"
     ;;
   *) BATCH_ID="$ARG" ;;
 esac
 : "${BATCH_ID:?BATCH_ID not resolved}"
 export BATCH_ID
+
+if [ -z "$JOB_YAML" ]; then
+  JOB_YAML=$(for y in "$PROJECT_ROOT"/remote_jobs/three_topology_v2/*.yaml; do
+    [ -e "$y" ] || continue
+    if [ "$("$PYTHON" -B "$THREE_TOPO_HERE/_job_parse.py" --batch "$y" 2>/dev/null)" = "$BATCH_ID" ]; then
+      echo "$y"; break
+    fi
+  done)
+  [ -n "$JOB_YAML" ] || { echo "[preflight] no job YAML found for batch $BATCH_ID" >&2; exit 2; }
+fi
+
+echo "== frozen batch manifest =="
+"$PYTHON" -B "$THREE_TOPO_HERE/_batch_manifest.py" --job "$JOB_YAML" --verify || exit 2
+MHDR=$("$PYTHON" -B "$THREE_TOPO_HERE/_batch_manifest.py" --job "$JOB_YAML" --shell) || {
+  echo "[preflight] cannot read batch manifest header" >&2; exit 2; }
+[ -n "$MHDR" ] || { echo "[preflight] empty batch manifest header" >&2; exit 2; }
+eval "$MHDR" || { echo "[preflight] cannot apply batch manifest header" >&2; exit 2; }
+export BATCH_ID
+
 print_resolved_config
 require_one_visible_gpu
+TASK_FILE="$(mktemp)"
+trap 'rm -f "$TASK_FILE"' EXIT
+"$PYTHON" -B "$THREE_TOPO_HERE/_batch_manifest.py" --job "$JOB_YAML" --paths > "$TASK_FILE" || {
+  echo "[preflight] cannot read batch task list" >&2; exit 2; }
+[ -s "$TASK_FILE" ] || { echo "[preflight] manifest has zero tasks" >&2; exit 2; }
+MODELS=$(awk -F'	' '$6=="gradient"{print $3}' "$TASK_FILE" | sort -u)
+[ -n "$MODELS" ] || { echo "[preflight] manifest has no gradient model" >&2; exit 2; }
+echo "== gradient models in batch: $(echo $MODELS) =="
 
 PF_ROOT="$PROJECT_ROOT/outputs/three_topology_v2/preflight/$BATCH_ID"
 mkdir -p "$PF_ROOT"
@@ -46,13 +85,22 @@ cat "$PF_ROOT/check_deps.json"
 echo "== data hashes =="
 bash "$THREE_TOPO_HERE/data_hash_check.sh" | tee "$PF_ROOT/data_hash.txt" || fail "data hash check failed"
 
-echo "== small CUDA preflight: MLP + HGT-global (1 batch, cuda:0 of caller's CVD) =="
+echo "== identity hashes (code/data/split/stats/config/manifest) =="
+set +e
+"$PYTHON" -B "$THREE_TOPO_HERE/_preflight_gate.py" --hashes --batch-id "$BATCH_ID" \
+  --project-root "$PROJECT_ROOT" --data-root "$DATA_ROOT" > "$PF_ROOT/hashes.json"
+HASH_RC=$?
+set -e
+cat "$PF_ROOT/hashes.json"
+[ "$HASH_RC" -eq 0 ] || fail "batch manifest / train config identity mismatch (see hashes.json)"
+
+echo "== one-batch CUDA preflight for each gradient model of the batch =="
 STATUS=0
-for MODEL in mlp hgt_global; do
+for MODEL in $MODELS; do
   RUNDIR="$PF_ROOT/runs/$TS/$MODEL"
   "$PYTHON" -B scripts/three_topology_v2/train_formal.py \
-    --config configs/three_topology_v2/formal_baselines.yaml \
-    --models "$MODEL" --split cross_design_topology1 --fold cd_fold_1 \
+    --config "$PROJECT_ROOT/${TRAIN_CONFIG:-configs/three_topology_v2/formal_baselines.yaml}" \
+    --models "$MODEL" --split "$SPLIT_ID" --fold "$FOLD_ID" \
     --device cuda:0 --smoke --max-batches 1 \
     --run-root "$RUNDIR" --require-new-dir \
     --batch-id "$BATCH_ID" --worker-id "pf_$MODEL" \
@@ -68,11 +116,17 @@ PY
 done
 [ "$STATUS" -eq 0 ] || fail "small CUDA train/val/best export failed (see *_console.log)"
 
-SAMPLES_SHA=$(sha256sum "$DATA_ROOT/data/processed/three_topology_graph_v1/samples.jsonl" | awk '{print $1}')
-MANIFEST_SHA=$(sha256sum "$DATA_ROOT/data/processed/three_topology_graph_v1/dataset_manifest.json" | awk '{print $1}')
-GIT_COMMIT=$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
-printf '{"result":"PASS","batch_id":"%s","external_cuda_visible_devices":"%s","visible_device_count":%s,"samples_jsonl_sha256":"%s","dataset_manifest_sha256":"%s","git_commit":"%s","at":"%s","dir":"%s"}\n' \
-  "$BATCH_ID" "$EXT_CVD" "$(visible_gpu_count)" "$SAMPLES_SHA" "$MANIFEST_SHA" "$GIT_COMMIT" "$TS" "$PF_ROOT" > "$PF_ROOT/.PASS.tmp"
-mv "$PF_ROOT/.PASS.tmp" "$PF_ROOT/PREFLIGHT_PASS.json"
+"$PYTHON" - "$PF_ROOT/hashes.json" "$PF_ROOT/PREFLIGHT_PASS.json" "$BATCH_ID" \
+  "$EXT_CVD" "$(visible_gpu_count)" "$TS" "$PF_ROOT" "$MODELS" <<'PY'
+import json, sys
+hashes = json.load(open(sys.argv[1], encoding="utf-8"))
+rec = {"result": "PASS", "batch_id": sys.argv[3],
+       "external_cuda_visible_devices": sys.argv[4],
+       "visible_device_count": int(sys.argv[5]), "at": sys.argv[6],
+       "dir": sys.argv[7], "gradient_models": sorted(sys.argv[8].split())}
+rec.update({k: v for k, v in hashes.items() if k != "batch_id"})
+json.dump(rec, open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+print("wrote", sys.argv[2])
+PY
 echo "[preflight] PASS -> $PF_ROOT/PREFLIGHT_PASS.json"
-echo "Next (four terminals): CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_v2/run_job.sh remote_jobs/three_topology_v2/<job>.yaml"
+echo "Next: CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_v2/run_job.sh remote_jobs/three_topology_v2/<job>.yaml"

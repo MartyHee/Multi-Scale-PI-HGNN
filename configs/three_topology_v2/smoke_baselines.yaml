@@ -1,0 +1,175 @@
+# ============================================================
+# smoke_baselines.yaml — LOCAL smoke/validation config (NOT formal).
+# Same model configs and supervision as formal_baselines.yaml; only the
+# training budget is shortened (2 epochs x 2 batches) and diagnostic
+# checks are on. Never use this file for the formal server jobs.
+# Formal budget stays 60 epochs / full pass in formal_baselines.yaml.
+# ============================================================
+data:
+  package_root: null
+  split_id: cross_design_topology1
+  fold_id: cd_fold_1
+  dtype: float32
+  verify_hash: true
+training:
+  seeds:
+  - 20261117
+  - 20261118
+  - 20261119
+  batch_size: 4
+  epochs: 2
+  lr: 0.001
+  weight_decay: 0.0
+  early_stopping_patience: 2
+  min_delta: 0.0
+  grad_clip: 5.0
+  selection_metric: graph_equal_task_equal_component_equal_normalized_mse
+  physics_loss_weight: 0.0
+  max_train_batches_per_epoch: 2
+  val_batch_size: 4
+  diagnostic: true
+  device: cpu
+models:
+  mlp:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    hidden_dims:
+    - 256
+    - 128
+    - 64
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+  hgt_global:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+    global_mode: mesh_global
+    global_fusion: gated_residual
+  hgt:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+  rgcn:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+  gcn:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+    use_type_embed: true
+  gat:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    gat_heads: 4
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+    use_type_embed: true
+  graphsage:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+    use_type_embed: true
+    aggr: mean
+  gin:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+    use_type_embed: true
+    train_eps: true
+  spectral_lift:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+    use_type_embed: true
+    rho_max: 0.99
+    init_ratio: 0.9
+  edge_aware_mpnn:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 6
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims:
+    - 64
+    - 32
+    structural_edge_dim: 10
+    edge_hidden_dim: 32
+    use_edge_attr: true
+    use_type_embedding: true
+ml:
+  ridge:
+    alpha: 1.0
+  hist_gb:
+    max_iter: 200
+    learning_rate: 0.1
+    max_depth: null

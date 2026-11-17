@@ -1,0 +1,11 @@
+# Second batch sb_20261118_01 — one terminal per model, 3 seeds sequential.
+# Terminal | CUDA_VISIBLE_DEVICES | job YAML | worker | model
+terminal1	<card1>	remote_jobs/three_topology_v2/gcn.yaml	t1_gcn	gcn
+terminal2	<card2>	remote_jobs/three_topology_v2/graphsage.yaml	t2_graphsage	graphsage
+terminal3	<card3>	remote_jobs/three_topology_v2/gat.yaml	t3_gat	gat
+terminal4	<card4>	remote_jobs/three_topology_v2/gin.yaml	t4_gin	gin
+terminal5	<card5>	remote_jobs/three_topology_v2/rgcn.yaml	t5_rgcn	rgcn
+terminal6	<card6>	remote_jobs/three_topology_v2/hgt.yaml	t6_hgt	hgt
+# Frozen task list: remote_jobs/three_topology_v2/manifests/sb_20261118_01.json (18 tasks)
+# Preflight: CUDA_VISIBLE_DEVICES=<card> bash server_ops/three_topology_v2/preflight.sh <any job.yaml>
+# Collect:   bash server_ops/three_topology_v2/collect_artifacts.sh <any job.yaml>

@@ -41,8 +41,12 @@ def die(msg: str) -> None:
 
 def project_root() -> Path:
     import os
-    if os.environ.get("PROJECT_ROOT"):
-        return Path(os.environ["PROJECT_ROOT"])
+    env = os.environ.get("PROJECT_ROOT")
+    if env:
+        m = re.match(r"^/([A-Za-z])/(.*)$", env)
+        if os.name == "nt" and m:
+            return Path(f"{m.group(1).upper()}:/{m.group(2)}")
+        return Path(env)
     return Path(__file__).resolve().parents[2]
 
 
@@ -141,6 +145,10 @@ def load(path: Path) -> dict:
 
 
 def main() -> int:
+    try:
+        sys.stdout.reconfigure(newline="\n")
+    except Exception:  # noqa: BLE001
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument("job_file")
     ap.add_argument("--shell", action="store_true")

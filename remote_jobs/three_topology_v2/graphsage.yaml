@@ -1,0 +1,13 @@
+# Second batch, terminal 2: GraphSAGE x3 seeds (GPU), topology1 cd_fold_1.
+# Launch: CUDA_VISIBLE_DEVICES=<card> bash server_ops/three_topology_v2/run_job.sh remote_jobs/three_topology_v2/graphsage.yaml
+job_name: graphsage
+batch_id: sb_20261118_01
+protocol: split
+split_id: cross_design_topology1
+fold_id: cd_fold_1
+train_config: configs/three_topology_v2/formal_baselines.yaml
+tasks:
+  - model: graphsage
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: t2_graphsage

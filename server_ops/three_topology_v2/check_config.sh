@@ -21,6 +21,8 @@ if [ -n "$ARG" ]; then
       echo "== job yaml ($ARG) =="
       "$PYTHON" -B "$THREE_TOPO_HERE/_job_parse.py" --summary "$ARG"
       BATCH=$("$PYTHON" -B "$THREE_TOPO_HERE/_job_parse.py" --batch "$ARG")
+      echo "== frozen batch manifest =="
+      "$PYTHON" -B "$THREE_TOPO_HERE/_batch_manifest.py" --job "$ARG" --verify || true
       ;;
     *) BATCH="$ARG" ;;
   esac

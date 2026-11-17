@@ -69,22 +69,11 @@ require_preflight() {
     echo "Run exactly: CUDA_VISIBLE_DEVICES=<gpu> bash \"$THREE_TOPO_HERE/preflight.sh\" <job.yaml>" >&2
     exit 4
   fi
-  grep -Eq '"result"[[:space:]]*:[[:space:]]*"PASS"' "$pf" || {
-    echo "[PRECHECK] preflight record is not PASS: $pf" >&2
-    echo "Re-run: CUDA_VISIBLE_DEVICES=<gpu> bash \"$THREE_TOPO_HERE/preflight.sh\" <job.yaml>" >&2
-    exit 4
-  }
-  local want got
-  want=$(sed -n 's/.*"samples_jsonl_sha256"[[:space:]]*:[[:space:]]*"\([0-9a-f]*\)".*/\1/p' "$pf" | head -1)
-  if [ -n "$want" ]; then
-    got=$(sha256sum "$DATA_ROOT/data/processed/three_topology_graph_v1/samples.jsonl" | awk '{print $1}')
-    [ "$got" = "$want" ] || {
-      echo "[PRECHECK] samples.jsonl changed since preflight" >&2
-      echo "Re-run: CUDA_VISIBLE_DEVICES=<gpu> bash \"$THREE_TOPO_HERE/preflight.sh\" <job.yaml>" >&2
-      exit 4
-    }
-  fi
-  echo "[PRECHECK] PASS ($pf)"
+  # Recompute code/data/split/stats/train-config/manifest identities and compare
+  # with the PASS record; any drift invalidates the old PASS.
+  "$PYTHON" -B "$THREE_TOPO_HERE/_preflight_gate.py" --check \
+    --batch-id "$BATCH_ID" --project-root "$PROJECT_ROOT" \
+    --data-root "$DATA_ROOT" --pass-file "$pf" >&2 || exit 4
 }
 
 print_resolved_config() {

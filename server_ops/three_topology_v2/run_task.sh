@@ -38,14 +38,19 @@ fi
 VIS_COUNT=$(visible_gpu_count); VIS_COUNT="${VIS_COUNT:-0}"
 
 STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+if [ "$RUN_MODE" = "resume" ]; then
+  : "${RESUME_CHECK_FILE:?resume mode needs RESUME_CHECK_FILE}"
+  [ -f "$RESUME_CHECK_FILE" ] || { echo "REFUSE: resume check record missing: $RESUME_CHECK_FILE" >&2; exit 2; }
+fi
 cat > "$RUN_DIR/TASK.json" <<EOF
 {"batch_id":"$BATCH_ID","worker_id":"$WORKER_ID","model":"$MODEL","seed":"$SEED",
  "run_mode":"$RUN_MODE","device":"$EXPOSED","external_cuda_visible_devices":"$EXT_CVD",
  "visible_device_count":$VIS_COUNT,"run_dir":"$RUN_DIR","resume_from":"${RESUME_FROM:-}",
+ "resume_check_file":"${RESUME_CHECK_FILE:-}","resume_of_worker":"${RESUME_OF_WORKER:-}","resume_of_run":"${RESUME_OF_RUN:-}",
  "protocol":"$PROTOCOL","train_config":"$TRAIN_CONFIG","started_at":"$STARTED","threads":$THREADS}
 EOF
-printf '{"state":"running","batch_id":"%s","worker_id":"%s","model":"%s","seed":"%s","device":"%s","external_cuda_visible_devices":"%s","started_at":"%s"}\n' \
-  "$BATCH_ID" "$WORKER_ID" "$MODEL" "$SEED" "$EXPOSED" "$EXT_CVD" "$STARTED" > "$RUN_DIR/.STATUS.json.tmp"
+printf '{"state":"running","batch_id":"%s","worker_id":"%s","model":"%s","seed":"%s","device":"%s","external_cuda_visible_devices":"%s","run_mode":"%s","resume_of_worker":"%s","resume_of_run":"%s","started_at":"%s"}\n' \
+  "$BATCH_ID" "$WORKER_ID" "$MODEL" "$SEED" "$EXPOSED" "$EXT_CVD" "$RUN_MODE" "${RESUME_OF_WORKER:-}" "${RESUME_OF_RUN:-}" "$STARTED" > "$RUN_DIR/.STATUS.json.tmp"
 mv "$RUN_DIR/.STATUS.json.tmp" "$RUN_DIR/STATUS.json"
 
 ARGS=(--config "$TRAIN_CONFIG" --models "$MODEL" --run-root "$RUN_DIR"
@@ -90,8 +95,8 @@ print(next(iter(m.values())).get('selection_metric') if m else '')
 PY
 )
 fi
-printf '{"state":"%s","batch_id":"%s","worker_id":"%s","model":"%s","seed":"%s","device":"%s","external_cuda_visible_devices":"%s","exit_code":%d,"selection_metric":%s,"finished_at":"%s","run_dir":"%s"}\n' \
-  "$STATE" "$BATCH_ID" "$WORKER_ID" "$MODEL" "$SEED" "$EXPOSED" "$EXT_CVD" "$rc" "${SEL:-null}" "$FINISHED" "$RUN_DIR" > "$RUN_DIR/.STATUS.json.tmp"
+printf '{"state":"%s","batch_id":"%s","worker_id":"%s","model":"%s","seed":"%s","device":"%s","external_cuda_visible_devices":"%s","run_mode":"%s","resume_of_worker":"%s","resume_of_run":"%s","exit_code":%d,"selection_metric":%s,"finished_at":"%s","run_dir":"%s"}\n' \
+  "$STATE" "$BATCH_ID" "$WORKER_ID" "$MODEL" "$SEED" "$EXPOSED" "$EXT_CVD" "$RUN_MODE" "${RESUME_OF_WORKER:-}" "${RESUME_OF_RUN:-}" "$rc" "${SEL:-null}" "$FINISHED" "$RUN_DIR" > "$RUN_DIR/.STATUS.json.tmp"
 mv "$RUN_DIR/.STATUS.json.tmp" "$RUN_DIR/STATUS.json"
 echo "[$STATE] $RUN_DIR (exit=$rc, device=$EXPOSED, CVD=$EXT_CVD)"
 exit "$rc"

@@ -1,0 +1,27 @@
+# Normalise text to LF in the index and in checkouts so byte-content hashes
+# (config/split/stats/manifest) are identical on Windows and Linux.
+* text=auto eol=lf
+
+*.py      text eol=lf
+*.sh      text eol=lf
+*.yaml    text eol=lf
+*.yml     text eol=lf
+*.json    text eol=lf
+*.jsonl   text eol=lf
+*.md      text eol=lf
+*.tsv     text eol=lf
+*.txt     text eol=lf
+*.sha256  text eol=lf
+*.cfg     text eol=lf
+*.toml    text eol=lf
+*.ini     text eol=lf
+
+*.pt      binary
+*.pth     binary
+*.pkl     binary
+*.tar     binary
+*.gz      binary
+*.zip     binary
+*.png     binary
+*.jpg     binary
+*.pdf     binary
