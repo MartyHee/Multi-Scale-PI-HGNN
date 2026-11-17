@@ -3,7 +3,21 @@
 # Required: PROJECT_ROOT BATCH_ID. Optional: PYTHON, OUT_TAR.
 # Excludes raw data / processed graphs / historical outputs. SHA256SUMS excludes itself.
 set -euo pipefail
-: "${PROJECT_ROOT:?}"; : "${BATCH_ID:?}"
+THREE_TOPO_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Direct use: load server_config.sh. Test harness that already provides
+# PROJECT_ROOT+BATCH_ID skips the loader.
+if [ -z "${PROJECT_ROOT:-}" ]; then
+  source "$THREE_TOPO_HERE/_load_config.sh"
+fi
+ARG="${1:-}"
+if [ -z "${BATCH_ID:-}" ]; then
+  [ -n "$ARG" ] || { echo "Usage: bash $0 <job.yaml|BATCH_ID>" >&2; exit 2; }
+  case "$ARG" in
+    *.yaml|*.yml) BATCH_ID=$("$PYTHON" -B "$THREE_TOPO_HERE/_job_parse.py" --batch "$ARG") ;;
+    *) BATCH_ID="$ARG" ;;
+  esac
+fi
+export BATCH_ID
 OUT_TAR="${OUT_TAR:-$PROJECT_ROOT/first_batch_${BATCH_ID}_artifacts.tar.gz}"
 BATCH_DIR="$PROJECT_ROOT/outputs/three_topology_v2/first_batch/$BATCH_ID"
 STAGE="$(mktemp -d)"

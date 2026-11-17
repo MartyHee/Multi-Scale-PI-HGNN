@@ -1,0 +1,13 @@
+# Terminal 3 job: HGT-global seed 20261118, topology1 cd_fold_1.
+# Launch: CUDA_VISIBLE_DEVICES=<gpuC> bash server_ops/three_topology_v2/run_job.sh remote_jobs/three_topology_v2/hgt_global_seed20261118.yaml
+job_name: hgt_global_seed20261118
+batch_id: fb_20261117_01
+protocol: split
+split_id: cross_design_topology1
+fold_id: cd_fold_1
+train_config: configs/three_topology_v2/formal_baselines.yaml
+tasks:
+  - model: hgt_global
+    seeds: [20261118]
+    device: gpu
+    worker: t3_hgt

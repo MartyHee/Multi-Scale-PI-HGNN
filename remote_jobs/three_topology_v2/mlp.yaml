@@ -1,0 +1,19 @@
+# Terminal 1 job: MLP x3 seeds (GPU) then Ridge + HistGB (CPU), topology1 cd_fold_1.
+# Launch: CUDA_VISIBLE_DEVICES=<gpuA> bash server_ops/three_topology_v2/run_job.sh remote_jobs/three_topology_v2/mlp.yaml
+job_name: mlp
+batch_id: fb_20261117_01
+protocol: split
+split_id: cross_design_topology1
+fold_id: cd_fold_1
+train_config: configs/three_topology_v2/formal_baselines.yaml
+tasks:
+  - model: mlp
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: t1_mlp
+  - model: ridge
+    device: cpu
+    worker: t1_ridge
+  - model: hist_gb
+    device: cpu
+    worker: t1_histgb

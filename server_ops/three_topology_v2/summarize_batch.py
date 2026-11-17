@@ -51,7 +51,8 @@ def main() -> int:
     ok = True
     for worker, run, kind in EXPECTED:
         d = batch_dir / worker / run
-        row = {"worker": worker, "run": run, "kind": kind, "dir": str(d)}
+        row = {"worker": worker, "run": run, "kind": kind, "dir": str(d),
+               "selection_metric": None}
         if not d.is_dir():
             row["state"] = "MISSING"; ok = False; rows.append(row); continue
         st_path = d / "STATUS.json"

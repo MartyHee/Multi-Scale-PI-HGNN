@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
-# Single-task launcher for the four-terminal first batch.
-# Atomic run dir; refuses duplicate; writes per-task STATUS.json; one GPU only.
+# Single-task launcher used by run_job.sh. Respects the caller's
+# CUDA_VISIBLE_DEVICES: GPU tasks use cuda:0 in-process and never touch it;
+# CPU tasks hide CUDA only for their own child python. Atomic run dir; duplicate
+# refusal; STATUS.json; resume.
 #
-# Required env: PROJECT_ROOT DATA_ROOT PYTHON BATCH_ID WORKER_ID MODEL RUN_MODE(new|resume)
-#   TASK_DEVICE(cpu|cuda); if cuda: GPU_ID (physical index); if resume: RESUME_FROM
-#   if gradient: SEED (e.g. 20261117); for ML set SEED="-"
-# Optional: THREADS (default 4), EXTRA_ARGS
+# Task env (set by run_job.sh): WORKER_ID MODEL SEED(- for ML) RUN_MODE TASK_DEVICE
+#   TRAIN_CONFIG PROTOCOL SPLIT_ID FOLD_ID OUTER_FOLD INNER_ID
+#   RESUME_FROM TASK_EPOCHS TASK_MAX_BATCHES
 set -euo pipefail
-: "${PROJECT_ROOT:?}"; : "${DATA_ROOT:?}"; : "${PYTHON:?}"
-: "${BATCH_ID:?}"; : "${WORKER_ID:?}"; : "${MODEL:?}"; : "${RUN_MODE:?}"; : "${TASK_DEVICE:?}"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_load_config.sh"
+require_preflight
+: "${WORKER_ID:?}"; : "${MODEL:?}"; : "${RUN_MODE:?}"; : "${TASK_DEVICE:?}"
+: "${TRAIN_CONFIG:?}"; : "${PROTOCOL:?}"
 SEED="${SEED:-}"
-THREADS="${THREADS:-4}"
-export THREE_TOPO_PACKAGE_ROOT="$DATA_ROOT"
+export OMP_NUM_THREADS="$THREADS" MKL_NUM_THREADS="$THREADS" OPENBLAS_NUM_THREADS="$THREADS"
 
 case "$MODEL" in
   ridge|hist_gb) [ -z "$SEED" ] && SEED="-" ;;
@@ -26,44 +28,54 @@ if ! mkdir "$RUN_DIR" 2>/dev/null; then
   exit 3
 fi
 
-# device mapping
+EXT_CVD="${CUDA_VISIBLE_DEVICES-<unset>}"
 if [ "$TASK_DEVICE" = "cpu" ]; then
-  export CUDA_VISIBLE_DEVICES=""
-  DEVICE_ARG="cpu"; EXPOSED="cpu"
+  DEVICE_ARG="cpu"; EXPOSED="cpu"; CHILD_CVD_SET=1
 else
-  : "${GPU_ID:?cuda task needs GPU_ID}"
-  export CUDA_VISIBLE_DEVICES="$GPU_ID"
-  DEVICE_ARG="cuda:0"; EXPOSED="cuda:0(physical $GPU_ID)"
+  require_one_visible_gpu
+  DEVICE_ARG="cuda:0"; EXPOSED="cuda:0"; CHILD_CVD_SET=0
 fi
-export OMP_NUM_THREADS="$THREADS" MKL_NUM_THREADS="$THREADS" OPENBLAS_NUM_THREADS="$THREADS"
+VIS_COUNT=$(visible_gpu_count); VIS_COUNT="${VIS_COUNT:-0}"
 
 STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-TASK_JSON="$RUN_DIR/TASK.json"
-cat > "$TASK_JSON" <<EOF
+cat > "$RUN_DIR/TASK.json" <<EOF
 {"batch_id":"$BATCH_ID","worker_id":"$WORKER_ID","model":"$MODEL","seed":"$SEED",
- "run_mode":"$RUN_MODE","device":"$EXPOSED","gpu_id":"${GPU_ID:-}","run_dir":"$RUN_DIR",
- "resume_from":"${RESUME_FROM:-}","started_at":"$STARTED","threads":$THREADS}
+ "run_mode":"$RUN_MODE","device":"$EXPOSED","external_cuda_visible_devices":"$EXT_CVD",
+ "visible_device_count":$VIS_COUNT,"run_dir":"$RUN_DIR","resume_from":"${RESUME_FROM:-}",
+ "protocol":"$PROTOCOL","train_config":"$TRAIN_CONFIG","started_at":"$STARTED","threads":$THREADS}
 EOF
-STATUS_TMP="$RUN_DIR/.STATUS.json.tmp"
-printf '{"state":"running","batch_id":"%s","worker_id":"%s","model":"%s","seed":"%s","device":"%s","started_at":"%s"}\n' \
-  "$BATCH_ID" "$WORKER_ID" "$MODEL" "$SEED" "$EXPOSED" "$STARTED" > "$STATUS_TMP"
-mv "$STATUS_TMP" "$RUN_DIR/STATUS.json"
+printf '{"state":"running","batch_id":"%s","worker_id":"%s","model":"%s","seed":"%s","device":"%s","external_cuda_visible_devices":"%s","started_at":"%s"}\n' \
+  "$BATCH_ID" "$WORKER_ID" "$MODEL" "$SEED" "$EXPOSED" "$EXT_CVD" "$STARTED" > "$RUN_DIR/.STATUS.json.tmp"
+mv "$RUN_DIR/.STATUS.json.tmp" "$RUN_DIR/STATUS.json"
 
-ARGS=(--config configs/three_topology_v2/formal_baselines.yaml
-      --models "$MODEL" --split cross_design_topology1 --fold cd_fold_1
-      --device "$DEVICE_ARG" --run-root "$RUN_DIR"
-      --batch-id "$BATCH_ID" --worker-id "$WORKER_ID")
+ARGS=(--config "$TRAIN_CONFIG" --models "$MODEL" --run-root "$RUN_DIR"
+      --device "$DEVICE_ARG" --batch-id "$BATCH_ID" --worker-id "$WORKER_ID")
+if [ "$PROTOCOL" = "inner" ]; then
+  : "${OUTER_FOLD:?inner protocol needs OUTER_FOLD}"; : "${INNER_ID:?inner protocol needs INNER_ID}"
+  ARGS+=(--protocol inner --outer-fold "$OUTER_FOLD" --inner-id "$INNER_ID")
+else
+  : "${SPLIT_ID:?split protocol needs SPLIT_ID}"; : "${FOLD_ID:?split protocol needs FOLD_ID}"
+  ARGS+=(--split "$SPLIT_ID" --fold "$FOLD_ID")
+fi
 [ "$SEED" != "-" ] && ARGS+=(--seeds "$SEED")
 if [ "$RUN_MODE" = "resume" ]; then
   : "${RESUME_FROM:?resume mode needs RESUME_FROM}"
   ARGS+=(--resume "$RESUME_FROM")
 fi
+[ -n "${TASK_EPOCHS:-}" ] && [ "$TASK_EPOCHS" != "-" ] && ARGS+=(--epochs "$TASK_EPOCHS")
+[ -n "${TASK_MAX_BATCHES:-}" ] && [ "$TASK_MAX_BATCHES" != "-" ] && ARGS+=(--max-batches "$TASK_MAX_BATCHES")
+# test-only extra args (never set on the server)
 # shellcheck disable=SC2206
-[ -n "${EXTRA_ARGS:-}" ] && ARGS+=($EXTRA_ARGS)
+[ -n "${THREE_TOPO_EXTRA_ARGS:-}" ] && ARGS+=($THREE_TOPO_EXTRA_ARGS)
 
 cd "$PROJECT_ROOT"
 set +e
-"$PYTHON" -B scripts/three_topology_v2/train_formal.py "${ARGS[@]}" > "$RUN_DIR/console.log" 2>&1
+if [ "$CHILD_CVD_SET" = "1" ]; then
+  # hide CUDA for THIS child only; caller's env and sibling tasks are unaffected
+  CUDA_VISIBLE_DEVICES="" "$PYTHON" -B scripts/three_topology_v2/train_formal.py "${ARGS[@]}" > "$RUN_DIR/console.log" 2>&1
+else
+  "$PYTHON" -B scripts/three_topology_v2/train_formal.py "${ARGS[@]}" > "$RUN_DIR/console.log" 2>&1
+fi
 rc=$?
 set -e
 
@@ -73,15 +85,13 @@ SEL=""
 if [ -f "$RUN_DIR/summary.json" ]; then
   SEL=$("$PYTHON" - "$RUN_DIR/summary.json" <<'PY' 2>/dev/null || true
 import json,sys
-s=json.load(open(sys.argv[1],encoding='utf-8'))
-m=s.get('models',{})
+s=json.load(open(sys.argv[1],encoding='utf-8')); m=s.get('models',{})
 print(next(iter(m.values())).get('selection_metric') if m else '')
 PY
 )
 fi
-STATUS_TMP="$RUN_DIR/.STATUS.json.tmp"
-printf '{"state":"%s","batch_id":"%s","worker_id":"%s","model":"%s","seed":"%s","device":"%s","exit_code":%d,"selection_metric":%s,"finished_at":"%s"}\n' \
-  "$STATE" "$BATCH_ID" "$WORKER_ID" "$MODEL" "$SEED" "$EXPOSED" "$rc" "${SEL:-null}" "$FINISHED" > "$STATUS_TMP"
-mv "$STATUS_TMP" "$RUN_DIR/STATUS.json"
-echo "[$STATE] $RUN_DIR (exit=$rc)"
+printf '{"state":"%s","batch_id":"%s","worker_id":"%s","model":"%s","seed":"%s","device":"%s","external_cuda_visible_devices":"%s","exit_code":%d,"selection_metric":%s,"finished_at":"%s","run_dir":"%s"}\n' \
+  "$STATE" "$BATCH_ID" "$WORKER_ID" "$MODEL" "$SEED" "$EXPOSED" "$EXT_CVD" "$rc" "${SEL:-null}" "$FINISHED" "$RUN_DIR" > "$RUN_DIR/.STATUS.json.tmp"
+mv "$RUN_DIR/.STATUS.json.tmp" "$RUN_DIR/STATUS.json"
+echo "[$STATE] $RUN_DIR (exit=$rc, device=$EXPOSED, CVD=$EXT_CVD)"
 exit "$rc"

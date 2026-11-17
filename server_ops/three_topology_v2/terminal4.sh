@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# TERMINAL 4 — GPU D: HGT-global seed 20261119.
-# Required env: PROJECT_ROOT DATA_ROOT PYTHON BATCH_ID GPU_D
-set -uo pipefail
-: "${PROJECT_ROOT:?}"; : "${DATA_ROOT:?}"; : "${PYTHON:?}"; : "${BATCH_ID:?}"; : "${GPU_D:?set GPU_D to a real GPU index}"
+# COMPATIBILITY WRAPPER -> run_job.sh remote_jobs/three_topology_v2/hgt_global_seed20261119.yaml
+# Prefer: CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_v2/run_job.sh remote_jobs/three_topology_v2/hgt_global_seed20261119.yaml
+set -euo pipefail
+: "${CUDA_VISIBLE_DEVICES:?set CUDA_VISIBLE_DEVICES=<gpu> (GPU D) before running}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKER_ID=t4_hgt MODEL=hgt_global SEED=20261119 RUN_MODE=new TASK_DEVICE=cuda GPU_ID="$GPU_D" \
-PROJECT_ROOT="$PROJECT_ROOT" DATA_ROOT="$DATA_ROOT" PYTHON="$PYTHON" BATCH_ID="$BATCH_ID" \
-bash "$HERE/run_task.sh"
-exit $?
+exec bash "$HERE/run_job.sh" "$HERE/../../remote_jobs/three_topology_v2/hgt_global_seed20261119.yaml"
