@@ -1,0 +1,10 @@
+wave	gpu	model	seed	device	command_status
+1	0	mlp	20261117	cuda:0	prepared
+1	1	mlp	20261118	cuda:0	prepared
+1	2	hgt_global	20261117	cuda:0	prepared
+1	3	hgt_global	20261118	cuda:0	prepared
+2	0	mlp	20261119	cuda:0	prepared
+2	1	hgt_global	20261119	cuda:0	prepared
+cpu	-	ridge+hist_gb	-	cpu	prepared
+# Notes: CUDA_VISIBLE_DEVICES selects the physical GPU; the entry sees cuda:0.
+# No DDP. Max 4 concurrent GPU jobs. Outer test never constructed.

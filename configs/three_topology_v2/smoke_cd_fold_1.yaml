@@ -1,0 +1,48 @@
+# ============================================================
+# smoke_cd_fold_1.yaml — single-fold CPU smoke (three-topology v2)
+#
+# Fold: topology1 cross-design cd_fold_1
+#   84 train graphs / 24 validation graphs / 36 outer-test graphs (test NOT scored)
+# Models: simple MLP and Paper-4B HGT-global (mesh_global), random init.
+# Physics loss weight = 0 (physics OFF). CPU-only. Link-check only — not a
+# performance result.
+# ============================================================
+
+data:
+  package_root: null            # null -> S1 default (raw_data/three_topology_graph_v1)
+  split_id: cross_design_topology1
+  fold_id: cd_fold_1
+  dtype: float32
+  verify_hash: true
+
+training:
+  seed: 20261116
+  batch_size: 2
+  num_train_batches: 6          # few batches only
+  val_all: true                 # validate over all validation graphs
+  lr: 0.001
+  weight_decay: 0.0
+  physical_loss_weight: 0.0     # physics OFF
+  device: cpu
+
+models:
+  mlp:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    hidden_dims: [256, 128, 64]
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+  hgt_global:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+    global_mode: mesh_global
+    global_fusion: gated_residual

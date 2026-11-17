@@ -1,0 +1,158 @@
+# ============================================================
+# formal_baselines.yaml — three-topology v2 formal baseline config
+#
+# 432 samples, v2 splits, same supervision (node disp/rot 6, beam I/J force 12).
+# All models random-initialised; physics loss OFF; outer test sealed.
+# Budget/selection/seed policy is frozen here before any test scoring.
+# ============================================================
+
+data:
+  package_root: null            # null -> S1 default raw_data/three_topology_graph_v1
+  split_id: cross_design_topology1
+  fold_id: cd_fold_1
+  dtype: float32
+  verify_hash: true
+
+training:
+  seeds: [20261117, 20261118, 20261119]   # formal: 3 seeds
+  batch_size: 4
+  epochs: 60
+  lr: 0.001
+  weight_decay: 0.0
+  early_stopping_patience: 15
+  min_delta: 0.0
+  grad_clip: 5.0
+  selection_metric: graph_equal_task_equal_component_equal_normalized_mse
+  physics_loss_weight: 0.0      # physics OFF
+  max_train_batches_per_epoch: null
+  val_batch_size: 4             # validation batch size (selection metric is batch-invariant)
+  diagnostic: false             # true -> per-step full parameter checksum
+  device: cpu                   # pass --device cuda / cuda:N to use GPU
+
+# Gradients: MLP (node15 + beam15 & endpoint-mean15), HGT-global anchor,
+# HGT, R-GCN, GCN, GAT, edge-aware MPNN (MeshGraphNet-style, reads edge_attr).
+models:
+  mlp:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    hidden_dims: [256, 128, 64]
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+  hgt_global:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+    global_mode: mesh_global
+    global_fusion: gated_residual
+  hgt:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+  rgcn:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+  gcn:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+  gat:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    gat_heads: 4
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+  graphsage:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+    aggr: mean
+  gin:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+    train_eps: true
+  spectral_lift:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 3          # recurrence depth L (paper small config; 3 for compute parity)
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+    rho_max: 0.99
+    init_ratio: 0.90
+  edge_aware_mpnn:
+    mesh_feat_dim: 15
+    beam_feat_dim: 15
+    plate_feat_dim: 6
+    hidden_dim: 128
+    num_layers: 6
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+    structural_edge_dim: 10
+    edge_hidden_dim: 32
+    use_edge_attr: true
+    use_type_embedding: true
+
+# Non-gradient classical ML on fixed-dim node/beam samples (same info as MLP).
+ml:
+  ridge:
+    alpha: 1.0
+  hist_gb:
+    max_iter: 200
+    learning_rate: 0.1
+    max_depth: null

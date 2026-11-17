@@ -230,3 +230,7 @@ __marimo__/
 /logs
 /remote_artifacts
 /.vscode
+# ML baseline pickles (defensive; normally under /outputs)
+*.pkl
+# local upload archives
+*.tar.gz

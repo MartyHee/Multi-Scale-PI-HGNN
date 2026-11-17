@@ -8,6 +8,8 @@ from src.models.baselines.ours_base import OursBaseline, OursBase, OursBaselineV
 from src.models.baselines.ms_hgt import MSHGTBaseline
 from src.models.baselines.hgt_global import HGTGlobalBaseline
 from src.models.baselines.edge_aware_mpnn import EdgeAwareMPNNBaseline
+from src.models.baselines.homogeneous_extra import GraphSAGEBaseline, GINBaseline
+from src.models.baselines.spectral_lift import SpectralLiftBaseline
 from src.models.baselines.decoders import MLPHead, DispDecoder, ForceDecoder
 from src.models.baselines.hetero_to_homo_adapter import HeteroToHomoAdapter
 
@@ -24,6 +26,9 @@ __all__ = [
     "MSHGTBaseline",
     "HGTGlobalBaseline",
     "EdgeAwareMPNNBaseline",
+    "GraphSAGEBaseline",
+    "GINBaseline",
+    "SpectralLiftBaseline",
     "MLPHead",
     "DispDecoder",
     "ForceDecoder",

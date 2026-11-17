@@ -1,0 +1,23 @@
+# ============================================================
+# server_paths.example.yaml — fill in for the server run (NOT used locally)
+#
+# The new data package location on the server is UNCONFIRMED. Replace the
+# placeholders explicitly; do NOT reuse the old GraphTrainingData2 paths.
+# Our loader resolves graph_path / extraction_path / run_manifest_path relative
+# to the data-package root, and honours the env var THREE_TOPO_PACKAGE_ROOT.
+# ============================================================
+
+project_root: "__PROJECT_ROOT__"          # e.g. /home/miniconda/Bishe/Multi-Scale-PI-HGNN
+data_package_root: "__DATA_PACKAGE_ROOT__" # e.g. /home/miniconda/Bishe/data/three_topology_graph_v1
+conda_env: "pi_hgnn"
+python: "__PYTHON__"                       # e.g. /home/miniconda/envs/pi_hgnn/bin/python
+
+# expected hashes of the unified index + manifest (verify on the server)
+expected:
+  samples_jsonl_sha256: "5d8bab5dd706c0f48e2310b69cbed877ce28b81e56b8eb18edef5c85801b99f4"
+  dataset_manifest_sha256: "c5db8924c9fb21cf33ab771cf231a23cb0723ed8c97c1dc63494b8175c82a6ad"
+
+resources:
+  gpus: [0, 1, 2, 3]      # at least 4x RTX 4090 available; only these are used
+  max_concurrent_gpu_jobs: 4
+  cpu_threads_for_trees: 4
