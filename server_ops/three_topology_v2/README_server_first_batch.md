@@ -49,9 +49,10 @@ CUDA_VISIBLE_DEVICES=<gpuD> bash server_ops/three_topology_v2/run_job.sh remote_
 ## 5. 监控 / 汇总
 ```bash
 bash server_ops/three_topology_v2/monitor.sh remote_jobs/three_topology_v2/mlp.yaml
-# 或直接：python server_ops/three_topology_v2/summarize_batch.py --batch-dir outputs/three_topology_v2/first_batch/<batch_id> --json
+# 机器可读：python server_ops/three_topology_v2/summarize_batch.py --batch <batch_id> --json
 ```
-汇总不强制要求 GPU。
+- 表格列：模型、seed、状态、已完成轮数/上限、当前验证指标、最佳验证指标、最近更新时间；`MONITOR_JSON=1` 输出 JSON。
+- 状态区分等待启动/训练中/已完成/已完成(早停)/失败/异常；训练中无 summary 不算失败；完成验收仍严格检查身份与文件。
 
 ## 6. 失败与恢复（YAML 显式 resume）
 失败：`STATUS.json state=failed`、`traceback.txt`、`console.log`。恢复示例（新 worker 目录，避免覆盖原 run）：

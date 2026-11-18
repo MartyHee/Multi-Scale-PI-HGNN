@@ -207,8 +207,8 @@ def scan(batch_id: str) -> dict:
             })
     if not tasks:
         die(f"batch {batch_id}: no tasks resolved from job YAMLs")
-    order = {"gcn": 0, "graphsage": 1, "gat": 2, "gin": 3, "rgcn": 4, "hgt": 5,
-             "mlp": 0, "hgt_global": 1, "ridge": 2, "hist_gb": 3}
+    order = {"mlp": 0, "gcn": 1, "graphsage": 2, "gat": 3, "gin": 4, "rgcn": 5,
+             "hgt": 6, "hgt_global": 7, "ridge": 8, "hist_gb": 9}
     tasks.sort(key=lambda t: (order.get(t["model"], 99), str(t["seed"]), t["worker"]))
     return {
         "schema": SCHEMA, "batch_id": batch_id,

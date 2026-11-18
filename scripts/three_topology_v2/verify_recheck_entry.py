@@ -34,6 +34,10 @@ def sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+def hash_json(obj):
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
 def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="recheck_test_"))
     smoke = tmp / "smoke_run"
@@ -69,16 +73,31 @@ def main() -> int:
 
     man_dir = MODEL_ROOT / "remote_jobs" / "three_topology_v2" / "manifests"
     man_dir.mkdir(parents=True, exist_ok=True)
+    split = json.loads((paths.SPLIT_DIR / "split_cross_design_topology1.json").read_text(encoding="utf-8"))
+    fold = next(f for f in split["folds"] if f["fold_id"] == "cd_fold_1")
+    stats = paths.STATS_DIR / "cross_design_topology1" / "cd_fold_1.json"
+    import yaml
+    cfg = yaml.safe_load((paths.CONFIG_DIR / "formal_baselines.yaml").read_text(encoding="utf-8"))
     man = {
-        "schema": "qt-three-topology-batch-manifest-v1", "batch_id": BATCH,
+        "schema": "qt-three-topology-batch-manifest-v2", "batch_id": BATCH,
         "protocol": "split", "split_id": "cross_design_topology1", "fold_id": "cd_fold_1",
         "outer_fold": "", "inner_id": "",
         "train_config": "configs/three_topology_v2/formal_baselines.yaml",
         "train_config_sha256": sha(MODEL_ROOT / "configs/three_topology_v2/formal_baselines.yaml"),
+        "input_identity": {
+            "split_source": "processed/three_topology_training_v2/splits/split_cross_design_topology1.json",
+            "split_sha256": sha(paths.SPLIT_DIR / "split_cross_design_topology1.json"),
+            "stats_source": "processed/three_topology_training_v2/stats/cross_design_topology1/cd_fold_1.json",
+            "stats_sha256": sha(stats),
+            "n_train": 84, "n_val": 24,
+            "train_sample_list_sha256": hash_json(sorted(fold["train_sample_ids"])),
+            "val_sample_list_sha256": hash_json(sorted(fold["validation_sample_ids"])),
+        },
         "source_jobs": ["local-test"], "n_tasks": 1,
         "tasks": [{"worker": "t_test", "run": RUN, "model": "hgt", "seed": "20261117",
                    "device": "gpu", "kind": "gradient", "job_name": "local_test",
-                   "job_file": "local-test"}],
+                   "job_file": "local-test", "epochs": 1, "max_batches": 1,
+                   "resume_from": None, "model_config_sha256": hash_json(cfg["models"]["hgt"])}],
     }
     man_path = man_dir / f"{BATCH}.json"
     man_path.write_text(json.dumps(man, indent=2), encoding="utf-8")
@@ -100,28 +119,48 @@ def main() -> int:
     summary_path = recheck_root / "RECHECK_SUMMARY.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.is_file() else {}
 
+    # identity mismatch must be rejected (no new inference; compare uses existing eval)
+    import torch
+    bad_ck = tmp / "bad_identity.pt"
+    ck = torch.load(orig / "checkpoints/best.pt", map_location="cpu", weights_only=False)
+    ck["identity"] = dict(ck.get("identity") or {}); ck["identity"]["model_name"] = "mlp"
+    torch.save(ck, bad_ck)
+    cmp_rc = subprocess.run([py, "-B", "scripts/three_topology_v2/compare_recheck.py",
+                             "--original", str(orig), "--recheck", str(recheck_root / "t_test" / RUN),
+                             "--checkpoint", str(bad_ck), "--manifest", str(man_path),
+                             "--project-root", str(MODEL_ROOT), "--data-root", str(paths.package_root()),
+                             "--worker", "t_test", "--run", RUN,
+                             "--out", str(tmp / "bad_recheck.json")],
+                            cwd=MODEL_ROOT, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace")
+
     report = {
         "schema": "qt-recheck-entry-local-validation-v1",
         "entry_rc": proc2.returncode,
         "stdout_tail": proc2.stdout[-1500:], "stderr_tail": proc2.stderr[-1500:],
         "summary_exists": summary_path.is_file(),
-        "summary_all_ok": summary.get("all_ok"), "n_runs": summary.get("n_runs"),
+        "summary_all_ok": summary.get("all_ok"), "expected": summary.get("expected"),
+        "passed": summary.get("passed"), "completed": summary.get("completed"),
         "runs": summary.get("runs"),
         "original_files_unchanged": before == after,
         "original_hashes": before,
         "recheck_written_elsewhere": all(not str(recheck_root).startswith(str(orig)) for _ in [0]),
-        "checkpoint_sha_recorded": bool(summary.get("runs") and
-                                        summary["runs"][0].get("checkpoint_sha256")),
+        "checkpoint_sha_recorded": bool(summary.get("tasks") and
+                                        summary["tasks"][0].get("checkpoint_sha256")),
+        "identity_mismatch_rc": cmp_rc.returncode,
+        "identity_mismatch_rejected": cmp_rc.returncode != 0,
     }
     report["all_ok"] = (proc2.returncode == 0 and report["summary_all_ok"] is True
+                        and report["expected"] == 1 and report["passed"] == 1
                         and report["original_files_unchanged"]
-                        and report["checkpoint_sha_recorded"])
+                        and report["checkpoint_sha_recorded"]
+                        and report["identity_mismatch_rejected"])
     out = MODEL_ROOT / "outputs" / "three_topology_v2" / "second_batch_preparation_20261118"
     out.mkdir(parents=True, exist_ok=True)
     (out / "recheck_entry_validation.json").write_text(json.dumps(report, ensure_ascii=False, indent=2),
                                                        encoding="utf-8")
-    print(json.dumps({k: report[k] for k in ("entry_rc", "summary_all_ok", "n_runs",
-                                             "original_files_unchanged", "all_ok")},
+    print(json.dumps({k: report[k] for k in ("entry_rc", "summary_all_ok", "expected",
+                                             "passed", "original_files_unchanged", "all_ok")},
                      ensure_ascii=False))
     # cleanup test-only manifest + run dirs (not the validation json)
     man_path.unlink(missing_ok=True)

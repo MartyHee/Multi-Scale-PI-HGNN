@@ -1,0 +1,13 @@
+# Budget-200 terminal 5: gin x3 seeds (GPU), topology1 cd_fold_1.
+# Launch: CUDA_VISIBLE_DEVICES=<card> bash server_ops/three_topology_v2/run_job.sh remote_jobs/three_topology_v2/budget200_gin.yaml
+job_name: budget200_gin
+batch_id: budget200_20261118_01
+protocol: split
+split_id: cross_design_topology1
+fold_id: cd_fold_1
+train_config: configs/three_topology_v2/budget200_baselines.yaml
+tasks:
+  - model: gin
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: t5_gin_b200

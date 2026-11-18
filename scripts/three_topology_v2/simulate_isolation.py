@@ -344,7 +344,7 @@ def main() -> int:
     # monitor still reads the frozen task list
     rc_mon, out_mon = run([bash_exe, posix(SERVER_OPS / "monitor.sh"), batch2],
                           env=dict(os.environ, PROJECT_ROOT=posix(fake), PYTHON=sys.executable))
-    reps["monitor_reads_manifest"] = rc_mon == 0 and "t1_gcn/gcn_seed20261117" in out_mon
+    reps["monitor_reads_manifest"] = rc_mon == 0 and "gcn" in out_mon and "20261117" in out_mon
 
     summarize = [py, "-B", str(SERVER_OPS / "summarize_batch.py"), "--batch-dir", str(base),
                  "--project-root", posix(fake), "--json"]
