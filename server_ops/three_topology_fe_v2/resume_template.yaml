@@ -1,0 +1,14 @@
+# Template only. Save OUTSIDE remote_jobs/three_topology_fe_v2/ (e.g. /tmp/resume.yaml).
+# Replace <...> placeholders. Target attempt = original_attempt+1 and must not exist.
+# Resume only continues the SAME configured total epoch budget; it is not a restart.
+job_name: resume_<topology>_<model>_<seed>
+batch_id: fv2_first_20261125_01
+mode: formal
+train_config: configs/three_topology_fe_v2/formal_pipeline.yaml
+tasks:
+  - topology: <topology1|topology2|topology3>
+    model: <mlp|hgt_global>
+    seeds: [<seed>]
+    device: gpu
+    worker: <new_worker_name>
+    resume_from: outputs/three_topology_fe_v2/formal/fv2_first_20261125_01/<topology>/<orig_worker>/<run>/attempt_<NN>/checkpoints/last.pt

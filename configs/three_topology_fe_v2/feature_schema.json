@@ -1,0 +1,984 @@
+{
+  "schema": "qt-three-topology-fe-v2-feature-schema-v1",
+  "date": "2026-11-25",
+  "raw_view": {
+    "mesh_node": {
+      "columns": [
+        {
+          "name": "X",
+          "unit": "m",
+          "dtype": "float64",
+          "source": "GET-NODE-DATA.Item2"
+        },
+        {
+          "name": "Y",
+          "unit": "m",
+          "dtype": "float64",
+          "source": "GET-NODE-DATA.Item3"
+        },
+        {
+          "name": "Z",
+          "unit": "m",
+          "dtype": "float64",
+          "source": "GET-NODE-DATA.Item4"
+        },
+        {
+          "name": "Fx",
+          "unit": "N",
+          "dtype": "float64",
+          "source": "loads_before_solve.rows[field].load_info[0]"
+        },
+        {
+          "name": "Fy",
+          "unit": "N",
+          "dtype": "float64",
+          "source": "loads_before_solve.rows[field].load_info[1]"
+        },
+        {
+          "name": "Fz",
+          "unit": "N",
+          "dtype": "float64",
+          "source": "loads_before_solve.rows[field].load_info[2]"
+        },
+        {
+          "name": "Mx",
+          "unit": "N*m",
+          "dtype": "float64",
+          "source": "loads_before_solve.rows[field].load_info[3]"
+        },
+        {
+          "name": "My",
+          "unit": "N*m",
+          "dtype": "float64",
+          "source": "loads_before_solve.rows[field].load_info[4]"
+        },
+        {
+          "name": "Mz",
+          "unit": "N*m",
+          "dtype": "float64",
+          "source": "loads_before_solve.rows[field].load_info[5]"
+        },
+        {
+          "name": "Dx_fix",
+          "unit": "0/1",
+          "dtype": "float64",
+          "source": "GET-GENERAL-SUPPORT-DATA.boundary_info[0]"
+        },
+        {
+          "name": "Dy_fix",
+          "unit": "0/1",
+          "dtype": "float64",
+          "source": "GET-GENERAL-SUPPORT-DATA.boundary_info[1]"
+        },
+        {
+          "name": "Dz_fix",
+          "unit": "0/1",
+          "dtype": "float64",
+          "source": "GET-GENERAL-SUPPORT-DATA.boundary_info[2]"
+        },
+        {
+          "name": "Rx_fix",
+          "unit": "0/1",
+          "dtype": "float64",
+          "source": "GET-GENERAL-SUPPORT-DATA.boundary_info[3]"
+        },
+        {
+          "name": "Ry_fix",
+          "unit": "0/1",
+          "dtype": "float64",
+          "source": "GET-GENERAL-SUPPORT-DATA.boundary_info[4]"
+        },
+        {
+          "name": "Rz_fix",
+          "unit": "0/1",
+          "dtype": "float64",
+          "source": "GET-GENERAL-SUPPORT-DATA.boundary_info[5]"
+        }
+      ],
+      "encoded_columns": [
+        {
+          "name": "X",
+          "transform": "zscore",
+          "unit": "m",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Y",
+          "transform": "zscore",
+          "unit": "m",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Z",
+          "transform": "zscore",
+          "unit": "m",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Fx",
+          "transform": "zero_preserve_rms",
+          "unit": "N",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Fy",
+          "transform": "zero_preserve_rms",
+          "unit": "N",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Fz",
+          "transform": "zero_preserve_rms",
+          "unit": "N",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Mx",
+          "transform": "zero_preserve_rms",
+          "unit": "N*m",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "My",
+          "transform": "zero_preserve_rms",
+          "unit": "N*m",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Mz",
+          "transform": "zero_preserve_rms",
+          "unit": "N*m",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Dx_fix",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Dy_fix",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Dz_fix",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Rx_fix",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Ry_fix",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Rz_fix",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        }
+      ]
+    },
+    "beam_element": {
+      "columns": [
+        {
+          "name": "Area_I",
+          "unit": "m^2",
+          "dtype": "float64",
+          "source": "actual I-end section property"
+        },
+        {
+          "name": "Ix_I",
+          "unit": "m^4",
+          "dtype": "float64",
+          "source": "actual I-end section property"
+        },
+        {
+          "name": "Iy_I",
+          "unit": "m^4",
+          "dtype": "float64",
+          "source": "actual I-end section property"
+        },
+        {
+          "name": "Iz_I",
+          "unit": "m^4",
+          "dtype": "float64",
+          "source": "actual I-end section property"
+        },
+        {
+          "name": "Area_J",
+          "unit": "m^2",
+          "dtype": "float64",
+          "source": "actual J-end section property"
+        },
+        {
+          "name": "Ix_J",
+          "unit": "m^4",
+          "dtype": "float64",
+          "source": "actual J-end section property"
+        },
+        {
+          "name": "Iy_J",
+          "unit": "m^4",
+          "dtype": "float64",
+          "source": "actual J-end section property"
+        },
+        {
+          "name": "Iz_J",
+          "unit": "m^4",
+          "dtype": "float64",
+          "source": "actual J-end section property"
+        },
+        {
+          "name": "ElasticModulus",
+          "unit": "Pa",
+          "dtype": "float64",
+          "source": "GET-MATERIAL-DATA.data_info[0]"
+        },
+        {
+          "name": "PoissonRatio",
+          "unit": "1",
+          "dtype": "float64",
+          "source": "GET-MATERIAL-DATA.data_info[2]"
+        },
+        {
+          "name": "UnitWeight",
+          "unit": "N/m^3",
+          "dtype": "float64",
+          "source": "GET-MATERIAL-DATA.data_info[1]"
+        },
+        {
+          "name": "Length",
+          "unit": "m",
+          "dtype": "float64",
+          "source": "derived from ordered I/J node coords"
+        },
+        {
+          "name": "CosX",
+          "unit": "1",
+          "dtype": "float64",
+          "source": "derived direction cosine J-I"
+        },
+        {
+          "name": "CosY",
+          "unit": "1",
+          "dtype": "float64",
+          "source": "derived direction cosine J-I"
+        },
+        {
+          "name": "CosZ",
+          "unit": "1",
+          "dtype": "float64",
+          "source": "derived direction cosine J-I"
+        },
+        {
+          "name": "beta_angle_deg",
+          "unit": "deg",
+          "dtype": "float64",
+          "source": "GET-ELEMENT-DATA.beta_angle"
+        },
+        {
+          "name": "is_tapered",
+          "unit": "0/1",
+          "dtype": "float64",
+          "source": "actual section sec_begin/sec_end definition"
+        }
+      ],
+      "encoded_columns": [
+        {
+          "name": "Area_I",
+          "transform": "zscore",
+          "unit": "m^2",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Ix_I",
+          "transform": "zscore",
+          "unit": "m^4",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Iy_I",
+          "transform": "zscore",
+          "unit": "m^4",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Iz_I",
+          "transform": "zscore",
+          "unit": "m^4",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Area_J",
+          "transform": "zscore",
+          "unit": "m^2",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Ix_J",
+          "transform": "zscore",
+          "unit": "m^4",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Iy_J",
+          "transform": "zscore",
+          "unit": "m^4",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Iz_J",
+          "transform": "zscore",
+          "unit": "m^4",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "ElasticModulus",
+          "transform": "zscore",
+          "unit": "Pa",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "PoissonRatio",
+          "transform": "zscore",
+          "unit": "1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "UnitWeight",
+          "transform": "zscore",
+          "unit": "N/m^3",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "Length",
+          "transform": "zscore",
+          "unit": "m",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "CosX",
+          "transform": "preserve",
+          "unit": "1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "CosY",
+          "transform": "preserve",
+          "unit": "1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "CosZ",
+          "transform": "preserve",
+          "unit": "1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "beta_sin",
+          "transform": "preserve",
+          "unit": "1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "beta_cos",
+          "transform": "preserve",
+          "unit": "1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "is_tapered",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "mlp",
+            "tree",
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        }
+      ]
+    },
+    "plate_element": {
+      "columns": [
+        {
+          "name": "ThicknessValue",
+          "unit": "m",
+          "dtype": "float64",
+          "source": "GET-THICKNESS-DATA.t"
+        },
+        {
+          "name": "ElasticModulus",
+          "unit": "Pa",
+          "dtype": "float64",
+          "source": "GET-MATERIAL-DATA.data_info[0]"
+        },
+        {
+          "name": "PoissonRatio",
+          "unit": "1",
+          "dtype": "float64",
+          "source": "GET-MATERIAL-DATA.data_info[2]"
+        },
+        {
+          "name": "UnitWeight",
+          "unit": "N/m^3",
+          "dtype": "float64",
+          "source": "GET-MATERIAL-DATA.data_info[1]"
+        },
+        {
+          "name": "BetaAngle",
+          "unit": "deg",
+          "dtype": "float64",
+          "source": "GET-ELEMENT-DATA.beta_angle (plate)"
+        },
+        {
+          "name": "PlateType",
+          "unit": "enum",
+          "dtype": "float64",
+          "source": "GET-ELEMENT-DATA.plate_type"
+        }
+      ],
+      "encoded_columns": [
+        {
+          "name": "ThicknessValue",
+          "transform": "zscore",
+          "unit": "m",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "ElasticModulus",
+          "transform": "zscore",
+          "unit": "Pa",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "PoissonRatio",
+          "transform": "zscore",
+          "unit": "1",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "UnitWeight",
+          "transform": "zscore",
+          "unit": "N/m^3",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "beta_sin",
+          "transform": "preserve",
+          "unit": "1",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "beta_cos",
+          "transform": "preserve",
+          "unit": "1",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "plate_type_0",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "plate_type_1",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        },
+        {
+          "name": "plate_type_unknown",
+          "transform": "preserve",
+          "unit": "0/1",
+          "models": [
+            "gcn",
+            "graphsage",
+            "gat",
+            "gin",
+            "rgcn",
+            "hgt",
+            "hgt_global"
+          ]
+        }
+      ]
+    }
+  },
+  "labels": {
+    "mesh_node": [
+      "dx",
+      "dy",
+      "dz",
+      "rx",
+      "ry",
+      "rz"
+    ],
+    "beam_element": [
+      "I_Fx",
+      "I_Fy",
+      "I_Fz",
+      "I_Mx",
+      "I_My",
+      "I_Mz",
+      "J_Fx",
+      "J_Fy",
+      "J_Fz",
+      "J_Mx",
+      "J_My",
+      "J_Mz"
+    ],
+    "units": {
+      "mesh_node": [
+        "m",
+        "m",
+        "m",
+        "rad",
+        "rad",
+        "rad"
+      ],
+      "beam_element": [
+        "N",
+        "N",
+        "N",
+        "N*m",
+        "N*m",
+        "N*m",
+        "N",
+        "N",
+        "N",
+        "N*m",
+        "N*m",
+        "N*m"
+      ]
+    }
+  },
+  "encoded_dims": {
+    "mesh_node": 15,
+    "beam_element": 18,
+    "plate_element": 9
+  },
+  "missing_policy": {
+    "node_load": "verified complete case: absent record is zero; raw sparse rows retained",
+    "other_fields": "null/empty/not_returned preserved; never fill 0 without evidence",
+    "unknown_plate_type": "one-hot unknown bucket",
+    "constant_zero": "preserved; marked; no arbitrary epsilon division"
+  },
+  "model_consumption": {
+    "common_view": [
+      "mesh_node.x",
+      "beam_element.x",
+      "plate_element.x",
+      "five relation edge_index"
+    ],
+    "labels": [
+      "mesh_node.y_disp",
+      "beam_element.y_force"
+    ],
+    "not_default": [
+      "beam end 29 sidecar",
+      "link edge_attr",
+      "release/master sidecar",
+      "analysis metadata",
+      "run/result identity"
+    ]
+  }
+}

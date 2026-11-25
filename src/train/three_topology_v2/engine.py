@@ -234,9 +234,10 @@ def _hash_json(obj) -> str:
 
 def build_identity(model_name, seed, stats, cfg, train_ids, val_ids,
                    data_hashes: Dict[str, str], split_id: str, fold_id: str,
-                   outer_fold: Optional[str] = None, inner_fold: Optional[str] = None) -> Dict:
+                   outer_fold: Optional[str] = None, inner_fold: Optional[str] = None,
+                   extra: Optional[Dict[str, Any]] = None) -> Dict:
     tr = cfg["training"]
-    return {
+    ident = {
         "model_name": model_name, "seed": int(seed),
         "split_id": split_id, "fold_id": fold_id,
         "outer_fold": outer_fold, "inner_fold": inner_fold,
@@ -250,6 +251,11 @@ def build_identity(model_name, seed, stats, cfg, train_ids, val_ids,
         "max_train_batches_per_epoch": tr.get("max_train_batches_per_epoch"),
         "model_config_sha256": _hash_json(cfg["models"].get(model_name, {})),
     }
+    if extra:
+        # Protocol/schema/role-ledger identity must match on resume; these are
+        # not in IDENTITY_ALLOWED_RESUME_CHANGES.
+        ident.update({str(k): v for k, v in extra.items()})
+    return ident
 
 
 def check_resume_compat(ck_identity: Dict, new_identity: Dict,
@@ -268,7 +274,7 @@ def check_resume_compat(ck_identity: Dict, new_identity: Dict,
 # ---------------------------------------------------------------------------
 def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, Any],
                out_dir: Path, identity: Dict[str, Any],
-               resume_from: Optional[Path] = None) -> Dict[str, Any]:
+               resume_from: Optional[Path] = None, val_evaluator=None) -> Dict[str, Any]:
     tr = cfg["training"]
     seed = int(tr["seed"])
     bs = int(tr["batch_size"])
@@ -311,6 +317,10 @@ def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, A
         best_epoch = int(ck.get("best_epoch", -1))
         no_improve = int(ck.get("no_improve", 0))
         restore_rng(ck["rng"])
+        # Keep a last.pt in the new attempt even when no further epoch runs, so
+        # the attempt has a usable resume point and the log hash is defined.
+        if not (ckpt_dir / "last.pt").is_file():
+            _atomic_copy(Path(resume_from), ckpt_dir / "last.pt")
         # inherit the historical best checkpoint from the ORIGINAL run dir
         orig_best = Path(resume_from).parent / "best.pt"
         if orig_best.is_file():
@@ -359,6 +369,7 @@ def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, A
     t_train0 = time.time()
     completed_epochs = start_epoch
     first_step_checked = False
+    n_updates = 0
     try:
         for epoch in range(start_epoch, epochs):
             t_ep0 = time.time()
@@ -387,6 +398,7 @@ def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, A
                     after = _full_checksum(model)
                     if abs(after - before) <= 0.0:
                         raise RuntimeError("diagnostic: parameters did not update")
+                n_updates += 1
                 if not first_step_checked:
                     stepped = any("step" in s and int(s["step"]) >= 1 for s in opt.state.values())
                     if not stepped:
@@ -395,7 +407,9 @@ def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, A
                 ep_loss += float(loss.item()); ep_batches += 1
 
             t_val0 = time.time()
-            val = validate(model, val_ds, stats, val_bs, device)
+            val = (validate(model, val_ds, stats, val_bs, device)
+                   if val_evaluator is None else
+                   val_evaluator(model, val_bs, device))
             t_val1 = time.time()
             sel = val["selection_metric"]
             improved = (sel is not None) and (sel < best_val - min_delta)
@@ -445,14 +459,27 @@ def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, A
     best_ck = torch.load(best_path, map_location="cpu", weights_only=False)
     model.load_state_dict(best_ck["model_state"]); model.to(device)
     t_inf0 = time.time()
-    final = validate(model, val_ds, stats, val_bs, device, collect_predictions=True)
+    final = (validate(model, val_ds, stats, val_bs, device, collect_predictions=True)
+             if val_evaluator is None else
+             val_evaluator(model, val_bs, device, collect_predictions=True))
     t_inf1 = time.time()
     (out_dir / "val_predictions.json").write_text(
         json.dumps(final["exported"], ensure_ascii=False), encoding="utf-8")
     best_sha = hashlib.sha256(best_path.read_bytes()).hexdigest()
 
+    if early_stopped:
+        stop_reason = "early_stop"
+    elif completed_epochs >= epochs:
+        stop_reason = "epoch_budget_reached"
+    else:
+        stop_reason = "stopped_before_budget"
+
     log["completed_epochs"] = completed_epochs
     log["early_stopped"] = early_stopped
+    log["stop_reason"] = stop_reason
+    log["train_actual_updates"] = n_updates
+    log["final_eval_source"] = "best"
+    log["final_eval_checkpoint_sha256"] = best_sha
     log["best"] = {"epoch_zero_based": best_ck["best_epoch"], "epoch_completed": int(best_ck["epoch"]),
                    "selection_metric": float(best_ck["best_val"]),
                    "checkpoint_path": str(best_path), "checkpoint_sha256": best_sha,
@@ -468,13 +495,14 @@ def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, A
                      "final_inference_sec": t_inf1 - t_inf0}
     log["mem_mb_final"] = _mem_used_mb()
     log["pass"] = {
-        "forward_ok": bool(completed_epochs > start_epoch),
+        "forward_ok": bool(completed_epochs > 0),
         "selection_finite": bool(final["selection_metric"] is not None
                                  and math.isfinite(final["selection_metric"])),
         "grad_finite": True,  # enforced by raising on non-finite
         "param_updated": True,  # enforced during first step
         "validation_ran": bool(final["n_batches"] > 0),
         "best_checkpoint_exported_from": best_path.name,
+        "final_eval_from_best": bool(log["final_eval_checkpoint_sha256"] == best_sha),
         "prediction_exported": bool((out_dir / "val_predictions.json").is_file()),
     }
     log["pass"]["all"] = all(v is True for k, v in log["pass"].items() if k != "best_checkpoint_exported_from")

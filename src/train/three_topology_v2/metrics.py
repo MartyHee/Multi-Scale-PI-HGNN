@@ -172,6 +172,8 @@ def export_records(sample_ids, node_counts, beam_counts, pred_disp, pred_force,
             "force_columns": FORCE_NAMES, "force_units": FORCE_UNITS,
             "stats_source": stats.get("source"),
             "stats_fold_id": stats.get("fold_id"),
+            "stats_topology": stats.get("topology_token"),
+            "stats_file_sha256": stats.get("_file_sha256"),
             "pred_disp": np.asarray(pred_disp[i], dtype=np.float64).tolist(),
             "pred_force": np.asarray(pred_force[i], dtype=np.float64).tolist(),
         })

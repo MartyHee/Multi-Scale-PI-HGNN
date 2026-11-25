@@ -1,0 +1,96 @@
+# Prepared formal-run configuration; NOT executed in this round.
+# Model input widths are injected from feature_schema.json, not hard-coded here.
+status: prepared_not_executed
+data:
+  package_root: null
+  processed_root: null
+  dtype: float32
+  verify_hash: true
+training:
+  seeds: [20261117, 20261118, 20261119]
+  batch_size: 4
+  epochs: 200
+  lr: 0.001
+  weight_decay: 0.0
+  early_stopping_patience: 15
+  min_delta: 0.0
+  grad_clip: 5.0
+  selection_metric: three_slice_graph_equal_task_equal_component_equal_normalized_mse
+  physics_loss_weight: 0.0
+  max_train_batches_per_epoch: null
+  val_batch_size: 4
+  diagnostic: false
+  device: cpu
+models:
+  mlp:
+    hidden_dims: [256, 128, 64]
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+  gcn:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+  graphsage:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+    aggr: mean
+  gat:
+    hidden_dim: 128
+    num_layers: 3
+    gat_heads: 4
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+  gin:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+    train_eps: true
+  rgcn:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+  hgt:
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+  hgt_global:
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+    global_mode: mesh_global
+    global_fusion: gated_residual
+ml:
+  ridge:
+    alpha: 1.0
+  hist_gb:
+    max_iter: 200
+    learning_rate: 0.1
+    max_depth: null

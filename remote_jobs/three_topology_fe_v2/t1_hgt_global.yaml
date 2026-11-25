@@ -1,0 +1,12 @@
+# Terminal 2: topology1 HGT-global x3 seeds (GPU).
+# CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_fe_v2/run_job.sh remote_jobs/three_topology_fe_v2/t1_hgt_global.yaml
+job_name: t1_hgt_global
+batch_id: fv2_first_20261125_01
+mode: formal
+train_config: configs/three_topology_fe_v2/formal_pipeline.yaml
+tasks:
+  - topology: topology1
+    model: hgt_global
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: t1_hgt_global

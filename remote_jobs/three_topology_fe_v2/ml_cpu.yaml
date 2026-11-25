@@ -1,0 +1,35 @@
+# Separate CPU batch (do not launch with the 18 GPU tasks).
+# CUDA_VISIBLE_DEVICES= bash server_ops/three_topology_fe_v2/run_job.sh remote_jobs/three_topology_fe_v2/ml_cpu.yaml
+# Ridge is deterministic (no seed); HistGB uses one explicit seed.
+job_name: ml_cpu
+batch_id: fv2_ml_20261125_01
+mode: formal
+train_config: configs/three_topology_fe_v2/formal_pipeline.yaml
+tasks:
+  - topology: topology1
+    model: ridge
+    device: cpu
+    worker: t1_ridge
+  - topology: topology1
+    model: hist_gb
+    seed: 20261125
+    device: cpu
+    worker: t1_histgb
+  - topology: topology2
+    model: ridge
+    device: cpu
+    worker: t2_ridge
+  - topology: topology2
+    model: hist_gb
+    seed: 20261125
+    device: cpu
+    worker: t2_histgb
+  - topology: topology3
+    model: ridge
+    device: cpu
+    worker: t3_ridge
+  - topology: topology3
+    model: hist_gb
+    seed: 20261125
+    device: cpu
+    worker: t3_histgb

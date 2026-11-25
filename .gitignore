@@ -237,3 +237,4 @@ __marimo__/
 
 # Local server config (edited once on the server; survives git pull)
 server_ops/three_topology_v2/server_config.sh
+server_ops/three_topology_fe_v2/server_config.sh
