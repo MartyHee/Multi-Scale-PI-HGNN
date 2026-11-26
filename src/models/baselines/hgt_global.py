@@ -72,7 +72,13 @@ EDGE_TYPES: List[Tuple[str, str, str]] = [
 
 METADATA = (NODE_TYPES, EDGE_TYPES)
 
-VALID_GLOBAL_MODES = ("mesh_global", "all_node_global")
+VALID_GLOBAL_MODES = ("mesh_global", "all_node_global", "off")
+
+
+def derive_global_init_seed(seed: int) -> int:
+    """Stable, build-order-independent RNG seed for the global module."""
+    value = (int(seed) * 1000003 + 97) % (2 ** 31 - 1)
+    return value if value else 1
 
 
 class GlobalBroadcastFusion(nn.Module):
@@ -171,8 +177,11 @@ class HGTGlobalBaseline(nn.Module):
         decoder_hidden_dims: Optional[List[int]] = None,
         global_mode: str = "mesh_global",
         global_fusion: str = "gated_residual",
+        init_seed: Optional[int] = None,
+        global_init_seed: Optional[int] = None,
     ):
         super().__init__()
+        _rng_state = torch.get_rng_state() if init_seed is not None else None
         if decoder_hidden_dims is None:
             decoder_hidden_dims = [64, 32]
 
@@ -233,15 +242,19 @@ class HGTGlobalBaseline(nn.Module):
             })
 
         # ---- Global (virtual) node machinery ----
-        # Recurrent global memory: input = mean-pooled mesh hidden (B, H),
-        # hidden = previous global state (B, H).
-        self.global_cell = nn.GRUCell(hidden_dim, hidden_dim)
-        # Project updated global state back to hidden space before broadcast.
-        self.global_bcast = nn.Linear(hidden_dim, hidden_dim)
-        self.fusion = GlobalBroadcastFusion(
-            hidden_dim=hidden_dim,
-            method=global_fusion,
-        )
+        # The global module must not depend on construction order.  When the
+        # shared backbone is seed-driven (init_seed given), its weights are
+        # drawn from a separate stable stream derived from the run seed.
+        self.init_seed = init_seed
+        self.global_init_seed = (None if init_seed is None else
+                                 int(global_init_seed if global_init_seed is not None
+                                     else derive_global_init_seed(init_seed)))
+        if self.global_init_seed is not None:
+            with torch.random.fork_rng(devices=[]):
+                torch.manual_seed(self.global_init_seed)
+                self._build_global_modules(hidden_dim, global_fusion)
+        else:
+            self._build_global_modules(hidden_dim, global_fusion)
 
         # ---- Decoders (same as HGTBaseline) ----
         self.disp_decoder = MLPHead(
@@ -261,8 +274,41 @@ class HGTGlobalBaseline(nn.Module):
             use_batch_norm=True,
         )
 
+        # Optional control: build the *shared* HGT backbone from a dedicated
+        # RNG state so plain HGT and HGT-global start from identical shared
+        # weights.  Global-module weights are drawn from their own stream and
+        # are not copied.
+        if init_seed is not None:
+            from src.models.baselines.hgt_baseline import HGTBaseline
+            with torch.random.fork_rng(devices=[]):
+                torch.manual_seed(int(init_seed))
+                ref = HGTBaseline(
+                    mesh_feat_dim=mesh_feat_dim, beam_feat_dim=beam_feat_dim,
+                    plate_feat_dim=plate_feat_dim, hidden_dim=hidden_dim,
+                    num_layers=num_layers, heads=heads, dropout=dropout,
+                    activation=activation, use_layer_norm=use_layer_norm,
+                    decoder_hidden_dims=decoder_hidden_dims, init_seed=None,
+                )
+            own = self.state_dict()
+            for key, value in ref.state_dict().items():
+                if key in own:
+                    own[key] = value
+            self.load_state_dict(own)
+            torch.set_rng_state(_rng_state)
+
         # Diagnostics buffer (most recent forward)
         self._last_global_stats: Optional[Dict] = None
+
+    def _build_global_modules(self, hidden_dim: int, global_fusion: str) -> None:
+        # Recurrent global memory: input = mean-pooled mesh hidden (B, H),
+        # hidden = previous global state (B, H).
+        self.global_cell = nn.GRUCell(hidden_dim, hidden_dim)
+        # Project updated global state back to hidden space before broadcast.
+        self.global_bcast = nn.Linear(hidden_dim, hidden_dim)
+        self.fusion = GlobalBroadcastFusion(
+            hidden_dim=hidden_dim,
+            method=global_fusion,
+        )
 
     def _pool_mesh_global(
         self,
@@ -296,6 +342,8 @@ class HGTGlobalBaseline(nn.Module):
                 - pred_force: ``(total_beam_elements, 12)``
         """
         device = batch["mesh_node"].x.device
+        if self.global_mode == "off":
+            self.fusion._last_gate = None
 
         # ---- 1. Type-specific projections (same as HGTBaseline) ----
         x_dict: Dict[str, torch.Tensor] = {
@@ -328,12 +376,16 @@ class HGTGlobalBaseline(nn.Module):
                 }
 
             # ---- Global path (mesh_global) ----
-            h_mesh = x_dict["mesh_node"]
-            g_pooled = self._pool_mesh_global(h_mesh, batch_vec)  # (B, H)
-            g_new = self.global_cell(g_pooled, g_prev)            # (B, H)
-            g_prev = g_new
-            broadcast = self.global_bcast(g_new)[batch_vec]       # (N, H)
-            x_dict["mesh_node"] = self.fusion(h_mesh, broadcast)
+            # ``global_mode='off'`` runs the exact HGT-only path.  The global
+            # parameters still exist but are never used; this is a *path*
+            # check, not a capacity-matched control.
+            if self.global_mode != "off":
+                h_mesh = x_dict["mesh_node"]
+                g_pooled = self._pool_mesh_global(h_mesh, batch_vec)  # (B, H)
+                g_new = self.global_cell(g_pooled, g_prev)            # (B, H)
+                g_prev = g_new
+                broadcast = self.global_bcast(g_new)[batch_vec]       # (N, H)
+                x_dict["mesh_node"] = self.fusion(h_mesh, broadcast)
 
         # ---- 5. Decode ----
         pred_disp = self.disp_decoder(x_dict["mesh_node"])

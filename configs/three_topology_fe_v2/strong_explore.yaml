@@ -1,0 +1,53 @@
+# 2026-11-26 strong-model exploration batch: 3 methods x 3 templates x seed 20261117.
+# NOT executed.  Separate from strong_baselines.yaml so the 36-task config hash
+# is not silently changed.  Anchors are the frozen defaults.
+status: prepared_not_executed
+formal_training_authorized: false
+data:
+  package_root: null
+  processed_root: null
+  dtype: float32
+  verify_hash: true
+training:
+  seeds: [20261117]
+  batch_size: 4
+  epochs: 200
+  lr: 0.001
+  weight_decay: 0.0
+  early_stopping_patience: 15
+  min_delta: 0.0
+  grad_clip: 5.0
+  selection_metric: three_slice_graph_equal_task_equal_component_equal_normalized_mse
+  physics_loss_weight: 0.0
+  max_train_batches_per_epoch: null
+  val_batch_size: 4
+  diagnostic: false
+  device: cpu
+  predictions_format: npz
+models:
+  meshgraphnet_explore:
+    hidden_dim: 128
+    processor_steps: 6
+    dropout: 0.1
+    activation: relu
+    decoder_hidden_dims: [64, 32]
+  transolver_plus_explore:
+    hidden_dim: 128
+    n_slices: 64
+    n_layers: 3
+    heads: 4
+    dropout: 0.1
+    ada_temp: true
+    gumbel_mode: train_only
+    mlp_ratio: 2.0
+    decoder_hidden_dims: [64, 32]
+  linearno_explore:
+    hidden_dim: 128
+    n_states: 64
+    n_layers: 3
+    heads: 4
+    dropout: 0.1
+    use_temperature: false
+    mlp_ratio: 2.0
+    decoder_hidden_dims: [64, 32]
+ml: {}

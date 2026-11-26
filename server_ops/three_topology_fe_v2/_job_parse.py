@@ -22,7 +22,10 @@ from pathlib import Path
 import yaml
 
 GRADIENT_MODELS = {"mlp", "hgt_global", "hgt", "rgcn", "gcn", "gat", "graphsage",
-                   "gin", "edge_aware_mpnn", "spectral_lift"}
+                   "gin", "edge_aware_mpnn", "spectral_lift",
+                   "hgt_global_off", "hgt_capmatch", "fullfield_mlp", "fullfield_query_mlp",
+                   "meshgraphnet", "transolver", "linearno",
+                   "meshgraphnet_explore", "transolver_plus_explore", "linearno_explore"}
 ML_MODELS = {"ridge", "hist_gb"}
 ALL_MODELS = GRADIENT_MODELS | ML_MODELS
 TOPOLOGIES = {"topology1", "topology2", "topology3"}

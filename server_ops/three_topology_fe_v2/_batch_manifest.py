@@ -30,11 +30,18 @@ from pathlib import Path
 
 SCHEMA = "qt-fe-v2-batch-manifest-v1"
 GRADIENT_MODELS = {"mlp", "hgt_global", "hgt", "rgcn", "gcn", "gat", "graphsage",
-                   "gin", "edge_aware_mpnn", "spectral_lift"}
+                   "gin", "edge_aware_mpnn", "spectral_lift",
+                   "hgt_global_off", "hgt_capmatch", "fullfield_mlp", "fullfield_query_mlp",
+                   "meshgraphnet", "transolver", "linearno",
+                   "meshgraphnet_explore", "transolver_plus_explore", "linearno_explore"}
 ML_MODELS = {"ridge", "hist_gb"}
 TOPO_ORDER = {"topology1": 0, "topology2": 1, "topology3": 2}
 MODEL_ORDER = {"mlp": 0, "hgt_global": 1, "hgt": 2, "rgcn": 3, "gcn": 4, "gat": 5,
-               "graphsage": 6, "gin": 7, "ridge": 8, "hist_gb": 9}
+               "graphsage": 6, "gin": 7, "ridge": 8, "hist_gb": 9,
+               "fullfield_mlp": 10, "hgt_capmatch": 11, "hgt_global_off": 12,
+               "meshgraphnet": 13, "transolver": 14, "linearno": 15,
+               "meshgraphnet_explore": 17, "transolver_plus_explore": 18, "linearno_explore": 19,
+               "fullfield_query_mlp": 16}
 
 
 def native(s):
@@ -100,6 +107,7 @@ def code_hash() -> str:
     roots = [MODEL_ROOT / "src" / "data" / "three_topology_fe_v2",
              MODEL_ROOT / "src" / "train" / "three_topology_v2",
              MODEL_ROOT / "src" / "models" / "baselines",
+             MODEL_ROOT / "src" / "models" / "strong_baselines",
              CONFIG_ROOT, HERE]
     files = []
     for root in roots:
@@ -199,11 +207,11 @@ def _input_identity() -> dict:
     }
 
 
-def _model_cfg(model: str, cfg: dict, seed: str) -> dict:
+def _model_cfg(model: str, cfg: dict, seed: str, topology: str) -> dict:
     if model in GRADIENT_MODELS:
         import importlib
         schema = importlib.import_module("src.data.three_topology_fe_v2.schema")
-        return schema.model_cfg_with_dims(model, cfg["models"][model])
+        return schema.task_model_cfg(model, cfg, topology, int(seed))
     mc = dict((cfg.get("ml") or {})[model])
     if model == "hist_gb":
         mc["seed"] = int(seed)
@@ -258,7 +266,7 @@ def scan(batch_id: str) -> dict:
                 "max_batches": (None if max_batches is None else int(max_batches)),
                 "resume_from": (None if t["resume_from"] in (None, "-") else
                                 str(t["resume_from"]).replace("\\", "/")),
-                "model_config_sha256": hash_json(_model_cfg(t["model"], cfg, t["seed"])),
+                "model_config_sha256": hash_json(_model_cfg(t["model"], cfg, t["seed"], t["topology"])),
             })
     if not tasks:
         die(f"batch {batch_id}: no tasks resolved from job YAMLs")

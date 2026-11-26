@@ -1,0 +1,13 @@
+# Prepared 2026-11-26 scientific-readiness revision; NOT started by cc.
+# CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_fe_v2/run_job.sh mech36_hgt_global_b.yaml
+job_name: mech36_hgt_global_b
+batch_id: fv2_mech36_20261126_01
+mode: formal
+train_config: configs/three_topology_fe_v2/strong_baselines.yaml
+description: "hgt_global topology3 x 3 seeds round B"
+tasks:
+  - topology: topology3
+    model: hgt_global
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: mech36_hgt_global_b

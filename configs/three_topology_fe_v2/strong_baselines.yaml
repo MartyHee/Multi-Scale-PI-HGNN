@@ -1,0 +1,178 @@
+# Strong-baseline / mechanism-control batches (prepared 2026-11-26).
+# NOT executed locally.  The training anchors below are byte-for-byte the same
+# policy as formal_pipeline.yaml (200 epochs, patience 15, min_delta 0, batch 4,
+# lr 1e-3, physics 0); this file is separate so completed first-batch
+# manifests keep their original config hash.
+status: prepared_not_executed
+formal_training_authorized: false
+data:
+  package_root: null
+  processed_root: null
+  dtype: float32
+  verify_hash: true
+training:
+  seeds: [20261117, 20261118, 20261119]
+  batch_size: 4
+  epochs: 200
+  lr: 0.001
+  weight_decay: 0.0
+  early_stopping_patience: 15
+  min_delta: 0.0
+  grad_clip: 5.0
+  selection_metric: three_slice_graph_equal_task_equal_component_equal_normalized_mse
+  physics_loss_weight: 0.0
+  max_train_batches_per_epoch: null
+  val_batch_size: 4
+  diagnostic: false
+  device: cpu
+  # New batches store per-slice predictions as lossless compressed NPZ + meta
+  # (float64 values unchanged); legacy runs stay JSON and remain readable.
+  predictions_format: npz
+  # Paired models initialise their shared backbone from the run seed.
+  init_policy: run_seed
+models:
+  mlp:
+    hidden_dims: [256, 128, 64]
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+  gcn:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+  graphsage:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+    aggr: mean
+  gat:
+    hidden_dim: 128
+    num_layers: 3
+    gat_heads: 4
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+  gin:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.2
+    activation: relu
+    use_batch_norm: true
+    decoder_hidden_dims: [64, 32]
+    use_type_embed: true
+    train_eps: true
+  rgcn:
+    hidden_dim: 128
+    num_layers: 3
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+  hgt:
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+    # Shared-backbone init: plain HGT and HGT-global get identical shared
+    # weights; the global module is still initialised from the run seed.
+  hgt_global:
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+    global_mode: mesh_global
+    global_fusion: gated_residual
+  # Capacity-matched no-global HGT.  hidden_dim=140 is the closest attainable
+  # width under the heads=4 / layers=3 constraint:
+  #   HGT-global 910,551 params; HGT-140 888,035 params (-2.47%).
+  # This matches trainable parameter count, NOT FLOPs: HGT-global also pays
+  # GRU + broadcast + gate costs per layer.
+  hgt_capmatch:
+    hidden_dim: 140
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+  # Same class with the global path disabled at run time.  The global params
+  # remain in the module but receive no gradient; this is a *path* control,
+  # not a capacity control.
+  hgt_global_off:
+    hidden_dim: 128
+    num_layers: 3
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [64, 32]
+    global_mode: off
+    global_fusion: gated_residual
+  fullfield_mlp:
+    # DEPRECATED compressed-context variant: x-sorted 8-bin mean/max.
+    # Kept only for the superseded field batch; not the full-field claim.
+    n_bins: 8
+    context_dim: 128
+    encoder_hidden: 256
+    hidden_dims: [128, 64]
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+  fullfield_query_mlp:
+    # Fixed-template full-field encoder: every node/beam/plate feature enters
+    # the flattened descriptor in frozen entity order; bottleneck_dim is the
+    # only compression.  field_dims are verified against the frozen graph sizes.
+    field_dims:
+      topology1: 52956
+      topology2: 87267
+      topology3: 150264
+    bottleneck_dim: 16
+    context_dim: 128
+    hidden_dims: [128, 64]
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: true
+  meshgraphnet:
+    hidden_dim: 128
+    processor_steps: 6
+    dropout: 0.1
+    activation: relu
+    decoder_hidden_dims: [64, 32]
+  transolver:
+    hidden_dim: 128
+    n_slices: 64
+    n_layers: 3
+    heads: 4
+    dropout: 0.1
+    ada_temp: true
+    gumbel_slices: false
+    decoder_hidden_dims: [64, 32]
+  linearno:
+    hidden_dim: 128
+    n_states: 64
+    n_layers: 3
+    dropout: 0.1
+    decoder_hidden_dims: [64, 32]
+ml:
+  ridge:
+    alpha: 1.0
+  hist_gb:
+    max_iter: 200
+    learning_rate: 0.1
+    max_depth: null

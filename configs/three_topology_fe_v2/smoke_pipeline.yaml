@@ -85,6 +85,66 @@ models:
     decoder_hidden_dims: [16, 8]
     use_type_embed: true
     train_eps: true
+  hgt_capmatch:
+    hidden_dim: 36
+    num_layers: 1
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [16, 8]
+    init_seed: 20261125
+  hgt_global_off:
+    hidden_dim: 32
+    num_layers: 1
+    heads: 4
+    dropout: 0.1
+    activation: relu
+    use_layer_norm: true
+    decoder_hidden_dims: [16, 8]
+    global_mode: off
+    global_fusion: gated_residual
+    init_seed: 20261125
+  fullfield_mlp:
+    n_bins: 4
+    context_dim: 32
+    encoder_hidden: 64
+    hidden_dims: [32, 16]
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: false
+  fullfield_query_mlp:
+    field_dims:
+      topology1: 52956
+      topology2: 87267
+      topology3: 150264
+    bottleneck_dim: 4
+    context_dim: 32
+    hidden_dims: [32, 16]
+    dropout: 0.1
+    activation: relu
+    use_batch_norm: false
+  meshgraphnet:
+    hidden_dim: 32
+    processor_steps: 2
+    dropout: 0.1
+    activation: relu
+    decoder_hidden_dims: [16, 8]
+  transolver:
+    hidden_dim: 32
+    n_slices: 8
+    n_layers: 1
+    heads: 4
+    dropout: 0.1
+    ada_temp: true
+    gumbel_slices: false
+    decoder_hidden_dims: [16, 8]
+  linearno:
+    hidden_dim: 32
+    n_states: 8
+    n_layers: 1
+    dropout: 0.1
+    decoder_hidden_dims: [16, 8]
 ml:
   ridge:
     alpha: 1.0

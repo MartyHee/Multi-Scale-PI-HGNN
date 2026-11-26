@@ -1,0 +1,28 @@
+{
+  "fv2_gnn_20261126_01": {
+    "manifest_sha256": "d247ca8361651403cba012284bd2bf4dbe776ba2d6816d88a814700272cf13a1",
+    "n_tasks": 54,
+    "code_sha256": "d9895b983215ec38503093a40be582174c903806c2f36df930684d6a888f3f62",
+    "train_config_sha256": "e12aa6c3892b5a9447d6a84272b49e64ea8a756b1b857effb67fcab9f0ece32f"
+  },
+  "fv2_field_20261126_01": {
+    "manifest_sha256": "3766a3bae7f2bf97cbe990a3a81fea2aad924d495034dd288c59ad30194ed0dd",
+    "n_tasks": 9,
+    "code_sha256": "d9895b983215ec38503093a40be582174c903806c2f36df930684d6a888f3f62",
+    "train_config_sha256": "e12aa6c3892b5a9447d6a84272b49e64ea8a756b1b857effb67fcab9f0ece32f"
+  },
+  "fv2_mech_20261126_01": {
+    "manifest_sha256": "3d0fc2cdce5a7e6d7d14f18e621825c61f29cfd68af3ea8fd28b6818b8e58322",
+    "n_tasks": 27,
+    "code_sha256": "d9895b983215ec38503093a40be582174c903806c2f36df930684d6a888f3f62",
+    "train_config_sha256": "e12aa6c3892b5a9447d6a84272b49e64ea8a756b1b857effb67fcab9f0ece32f"
+  },
+  "fv2_strong_20261126_01": {
+    "manifest_sha256": "dea9e990930e1baace01d009ec38b5f377b1737eef91dd9912639db04cd2faa0",
+    "n_tasks": 27,
+    "code_sha256": "d9895b983215ec38503093a40be582174c903806c2f36df930684d6a888f3f62",
+    "train_config_sha256": "e12aa6c3892b5a9447d6a84272b49e64ea8a756b1b857effb67fcab9f0ece32f"
+  },
+  "_note": "Superseded 2026-11-26 by the scientific-readiness revision: fixed init_seed, old binned field baseline, and unverified strong-model tasks must not be launched. Frozen manifests are archived under manifests/superseded_20261126/; job YAMLs under superseded_20261126/. Replacement mechanism batch: fv2_mech36_20261126_01.",
+  "_replacement": "fv2_mech36_20261126_01"
+}

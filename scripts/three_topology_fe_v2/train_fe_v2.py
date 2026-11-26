@@ -189,7 +189,7 @@ def _check_formal_preflight(man: dict, task: dict, cfg_path: Path, cfg: dict) ->
 def _expected_model_cfg(task: dict, cfg: dict) -> dict:
     model = task["model"]
     if model in GRADIENT:
-        return schema.model_cfg_with_dims(model, cfg["models"][model])
+        return schema.task_model_cfg(model, cfg, task["topology"], int(task["seed"]))
     mc = dict(cfg["ml"][model])
     if model == "hist_gb":
         mc["seed"] = int(task["seed"])
@@ -238,8 +238,9 @@ def _cache_hashes(topology: str) -> dict:
     }
 
 
-def _identity_extra(topology: str) -> dict:
+def _identity_extra(topology: str, model_name: str, seed: int) -> dict:
     split_dir = paths.PROCESSED_ROOT / "splits"
+    init_from_seed = model_name in schema.INIT_FROM_RUN_SEED
     out = {
         "protocol_id": PROTOCOL_ID,
         "protocol_sha256": sha_raw(split_dir / f"{PROTOCOL_ID}.json"),
@@ -247,7 +248,12 @@ def _identity_extra(topology: str) -> dict:
         "split_manifest_sha256": sha_raw(split_dir / "split_manifest.json"),
         "feature_schema_sha256": sha_lf(paths.FEATURE_SCHEMA),
         "topology": topology,
+        "init_policy": "run_seed" if init_from_seed else "module_default",
+        "init_seed": int(seed) if init_from_seed else None,
     }
+    if model_name in ("hgt_global", "hgt_global_off"):
+        from src.models.baselines.hgt_global import derive_global_init_seed
+        out["global_init_seed"] = derive_global_init_seed(int(seed))
     out.update(_cache_hashes(topology))
     return out
 
@@ -302,7 +308,8 @@ def _run_gradient(args, cfg, cfg_path, task, out_dir, train_ids, val, st, idx,
     local = json.loads(json.dumps(cfg))
     local["training"]["seed"] = seed
     local["training"]["device"] = args.device
-    local["models"][model_name] = schema.model_cfg_with_dims(model_name, cfg["models"][model_name])
+    local["models"][model_name] = schema.task_model_cfg(
+        model_name, cfg, task["topology"], seed)
     engine.seed_everything(seed)
     model = registry.build_gradient_model(model_name, local["models"][model_name])
     shared = _shared_cache(idx, task["topology"])
@@ -313,11 +320,14 @@ def _run_gradient(args, cfg, cfg_path, task, out_dir, train_ids, val, st, idx,
                                 use_shared=shared is not None, shared=shared,
                                 topology=task["topology"])
               for name, ids in val.items()}
-    evaluator = MultiSliceEvaluator(list(val_ds.items()), st, max_batches=max_val_batches)
+    pred_fmt = str(cfg["training"].get("predictions_format", "json"))
+    evaluator = MultiSliceEvaluator(list(val_ds.items()), st, max_batches=max_val_batches,
+                                    predictions_format=pred_fmt)
     identity = engine.build_identity(
         model_name, seed, st, local, train_ids,
         [s for ids in val.values() for s in ids], _data_hashes(idx),
-        PROTOCOL_ID, task["topology"], extra=_identity_extra(task["topology"]))
+        PROTOCOL_ID, task["topology"],
+        extra=_identity_extra(task["topology"], model_name, seed))
     log = engine.train_fold(model_name, model, tr, SliceBundle(val_ds.values()), st, local,
                             out_dir, identity, resume_from=resume_from,
                             val_evaluator=evaluator)
@@ -351,7 +361,9 @@ def _run_gradient(args, cfg, cfg_path, task, out_dir, train_ids, val, st, idx,
         "train_actual_updates": log.get("train_actual_updates"),
         "physics_loss_weight": 0.0, "test_constructed": False,
         "protocol": PROTOCOL_ID, "resume": log.get("resumed"),
-        "val_predictions": [f"val_predictions_{k}.json" for k in val],
+        "predictions_format": pred_fmt,
+        "val_predictions": [f"val_predictions_{k}.{ 'npz' if pred_fmt == 'npz' else 'json'}"
+                            for k in val],
     }
     write_json_atomic(out_dir / "summary.json", summary)
     return log.get("pass", {}).get("all") is True, summary
@@ -396,7 +408,9 @@ def _run_ml(args, cfg, task, out_dir, train_ids, val, st, idx, max_val_batches):
                                 use_shared=shared is not None, shared=shared,
                                 topology=task["topology"])
               for name, ids in val.items()}
-    evaluator = MultiSliceEvaluator(list(val_ds.items()), st, max_batches=max_val_batches)
+    pred_fmt = str(cfg["training"].get("predictions_format", "json"))
+    evaluator = MultiSliceEvaluator(list(val_ds.items()), st, max_batches=max_val_batches,
+                                    predictions_format=pred_fmt)
     ev = evaluator(predictor, int(cfg["training"].get("val_batch_size", 4)),
                    torch.device("cpu"), collect_predictions=True)
     if ev.get("selection_metric") is None:
@@ -404,7 +418,8 @@ def _run_ml(args, cfg, task, out_dir, train_ids, val, st, idx, max_val_batches):
     agg = evaluator.write_slice_artifacts(out_dir, run_label="single_fit")
     if abs(agg["selection_metric_equal_mean"] - ev["selection_metric"]) > 1e-12:
         raise RuntimeError("per-slice equal-mean selection != evaluator selection")
-    write_json_atomic(out_dir / "val_predictions.json", evaluator.last["exported"])
+    if pred_fmt == "json":
+        write_json_atomic(out_dir / "val_predictions.json", evaluator.last["exported"])
     summary = {
         "schema": SCHEMA_ID, "mode": args.mode, "status": "done",
         "batch_id": args.batch_id, "topology": task["topology"], "worker": task["worker"],
@@ -423,7 +438,9 @@ def _run_ml(args, cfg, task, out_dir, train_ids, val, st, idx, max_val_batches):
         "physics_loss_weight": 0.0, "test_constructed": False,
         "protocol": PROTOCOL_ID, "resume": None,
         "fit": fit_rec,
-        "val_predictions": [f"val_predictions_{k}.json" for k in val],
+        "predictions_format": pred_fmt,
+        "val_predictions": [f"val_predictions_{k}.{ 'npz' if pred_fmt == 'npz' else 'json'}"
+                            for k in val],
     }
     write_json_atomic(out_dir / "summary.json", summary)
     return ev.get("selection_metric") is not None, summary

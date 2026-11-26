@@ -1,0 +1,23 @@
+# Prepared 2026-11-26; NOT started by cc. Six-GPU cap: one job per terminal.
+# CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_fe_v2/run_job.sh strong_meshgraphnet.yaml
+job_name: strong_meshgraphnet
+batch_id: fv2_strong_20261126_01
+mode: formal
+train_config: configs/three_topology_fe_v2/strong_baselines.yaml
+description: meshgraphnet task adaptation x 3 topologies x 3 seeds
+tasks:
+  - topology: topology1
+    model: meshgraphnet
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: strong_meshgraphnet
+  - topology: topology2
+    model: meshgraphnet
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: strong_meshgraphnet
+  - topology: topology3
+    model: meshgraphnet
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: strong_meshgraphnet

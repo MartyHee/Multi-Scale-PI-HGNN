@@ -62,12 +62,15 @@ from pathlib import Path
 summ = json.load(open(sys.argv[1], encoding="utf-8"))
 stage = Path(sys.argv[2])
 req_grad = ["STATUS.json","TASK.json","console.log","run_log.json","summary.json",
-            "train_log.csv","slice_metrics.json","val_predictions.json",
-            "val_predictions_design_val.json","val_predictions_load_val.json",
-            "val_predictions_joint_val.json","checkpoints/best.pt","checkpoints/last.pt"]
-req_ml = ["STATUS.json","TASK.json","console.log","summary.json","slice_metrics.json",
-          "val_predictions.json","val_predictions_design_val.json",
-          "val_predictions_load_val.json","val_predictions_joint_val.json","ml_fit.json"]
+            "train_log.csv","slice_metrics.json","checkpoints/best.pt","checkpoints/last.pt"]
+req_ml = ["STATUS.json","TASK.json","console.log","summary.json","slice_metrics.json","ml_fit.json"]
+slices = ("design_val","load_val","joint_val")
+def missing(dst, req):
+    miss = [f for f in req if not (dst / f).is_file()]
+    for s in slices:
+        if not any((dst / f"val_predictions_{s}.{ext}").is_file() for ext in ("json","npz")):
+            miss.append(f"val_predictions_{s}.json|npz")
+    return miss
 bad = 0
 supersedes = []
 for r in summ["rows"]:
@@ -77,9 +80,8 @@ for r in summ["rows"]:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src, dst, dirs_exist_ok=True)
         req = req_grad if r["kind"] == "gradient" else req_ml + [f"ml_{r['run']}.pkl"]
-        for f in req:
-            if not (dst / f).is_file():
-                print(f"MISSING required: {dst / f}", file=sys.stderr); bad = 1
+        for f in missing(dst, req):
+            print(f"MISSING required: {dst / f}", file=sys.stderr); bad = 1
         if r.get("superseded_by"):
             supersedes.append(f"{r['topology']}/{r['worker']}/{r['run']} <- {r['superseded_by']}")
     else:

@@ -103,8 +103,10 @@ class HGTBaseline(nn.Module):
         activation: str = "relu",
         use_layer_norm: bool = True,
         decoder_hidden_dims: Optional[List[int]] = None,
+        init_seed: Optional[int] = None,
     ):
         super().__init__()
+        _rng_state = torch.get_rng_state() if init_seed is not None else None
         if decoder_hidden_dims is None:
             decoder_hidden_dims = [64, 32]
 
@@ -168,6 +170,25 @@ class HGTBaseline(nn.Module):
             activation=activation,
             use_batch_norm=True,
         )
+
+        # Optional reproducible shared initialisation.  Building a reference
+        # instance under a dedicated RNG state makes the HGT backbone identical
+        # across the plain-HGT / HGT-global pair even though the two classes
+        # consume the ambient RNG differently.  ``init_seed=None`` keeps the
+        # historical behaviour.
+        self.init_seed = init_seed
+        if init_seed is not None:
+            with torch.random.fork_rng(devices=[]):
+                torch.manual_seed(int(init_seed))
+                ref = HGTBaseline(
+                    mesh_feat_dim=mesh_feat_dim, beam_feat_dim=beam_feat_dim,
+                    plate_feat_dim=plate_feat_dim, hidden_dim=hidden_dim,
+                    num_layers=num_layers, heads=heads, dropout=dropout,
+                    activation=activation, use_layer_norm=use_layer_norm,
+                    decoder_hidden_dims=decoder_hidden_dims, init_seed=None,
+                )
+            self.load_state_dict(ref.state_dict())
+            torch.set_rng_state(_rng_state)
 
     def forward(self, batch) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass on a ``HeteroDataBatch``.

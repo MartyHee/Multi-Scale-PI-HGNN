@@ -11,7 +11,11 @@ from typing import Any, Dict
 
 GRADIENT_MODELS = {
     "mlp", "hgt_global", "hgt", "rgcn", "gcn", "gat", "graphsage", "gin",
-    "edge_aware_mpnn", "spectral_lift"
+    "edge_aware_mpnn", "spectral_lift",
+    # 2026-11-26 strong-baseline / mechanism batch additions
+    "hgt_global_off", "hgt_capmatch", "fullfield_mlp", "fullfield_query_mlp",
+    "meshgraphnet", "transolver", "linearno",
+    "meshgraphnet_explore", "transolver_plus_explore", "linearno_explore",
 }
 NON_GRADIENT_MODELS = {"ridge", "hist_gb"}
 
@@ -24,9 +28,29 @@ def build_gradient_model(name: str, cfg: Dict[str, Any]):
     if name == "hgt_global":
         from src.models.baselines.hgt_global import HGTGlobalBaseline
         return HGTGlobalBaseline(**cfg)
-    if name == "hgt":
+    if name == "hgt_global_off":
+        from src.models.baselines.hgt_global import HGTGlobalBaseline
+        cfg = dict(cfg)
+        cfg["global_mode"] = "off"
+        return HGTGlobalBaseline(**cfg)
+    if name in ("hgt", "hgt_capmatch"):
         from src.models.baselines.hgt_baseline import HGTBaseline
         return HGTBaseline(**cfg)
+    if name == "fullfield_mlp":
+        from src.models.strong_baselines.fullfield import FullFieldMLPBaseline
+        return FullFieldMLPBaseline(**cfg)
+    if name == "fullfield_query_mlp":
+        from src.models.strong_baselines.fullfield_query import FullFieldQueryMLPBaseline
+        return FullFieldQueryMLPBaseline(**cfg)
+    if name in ("meshgraphnet", "meshgraphnet_explore"):
+        from src.models.strong_baselines.meshgraphnet import MeshGraphNetBaseline
+        return MeshGraphNetBaseline(**cfg)
+    if name in ("transolver", "transolver_plus_explore"):
+        from src.models.strong_baselines.transolver import TransolverBaseline
+        return TransolverBaseline(**cfg)
+    if name in ("linearno", "linearno_explore"):
+        from src.models.strong_baselines.linearno import LinearNOBaseline
+        return LinearNOBaseline(**cfg)
     if name == "rgcn":
         from src.models.baselines.hetero_rgcn import HeteroRGCNBaseline
         return HeteroRGCNBaseline(**cfg)

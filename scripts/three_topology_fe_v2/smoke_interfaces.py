@@ -19,7 +19,9 @@ from src.data.three_topology_fe_v2.dataset import FeV2Dataset  # noqa: E402
 from src.data.three_topology_fe_v2 import index as index_mod  # noqa: E402
 from src.train.three_topology_v2 import engine, registry  # noqa: E402
 
-MODELS = ["mlp", "gcn", "graphsage", "gat", "gin", "rgcn", "hgt", "hgt_global"]
+MODELS = ["mlp", "gcn", "graphsage", "gat", "gin", "rgcn", "hgt", "hgt_global",
+          "hgt_capmatch", "hgt_global_off", "fullfield_mlp", "meshgraphnet",
+          "transolver", "linearno"]
 
 
 def load_yaml(path):
@@ -31,11 +33,14 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--config", default=str(paths.CONFIG_ROOT / "smoke_pipeline.yaml"))
+    ap.add_argument("--protocol", default=str(paths.PROCESSED_ROOT / "splits" / "protocol_v1.json"))
+    ap.add_argument("--models", default=None,
+                    help="comma-separated subset; default: all MODELS present in config")
     ap.add_argument("--out", default=str(paths.OUTPUT_ROOT / "smoke_interfaces"))
     a = ap.parse_args()
     cfg = load_yaml(Path(a.config))
     idx = index_mod.load_index()
-    prot = json.loads((paths.PROCESSED_ROOT / "splits" / "protocol_candidate.json").read_text(encoding="utf-8"))
+    prot = json.loads(Path(a.protocol).read_text(encoding="utf-8"))
     st = stats_mod.load_stats(paths.PROCESSED_ROOT / "stats" / "topology1.json")
     train_ids = [s for s, v in prot["roles"].items()
                  if idx.by_id[s]["topology_token"] == "topology1" and v["A"] == "train"][:2]
@@ -44,11 +49,13 @@ def main() -> int:
     dev = engine.resolve_device(a.device)
     batch = batch.to(dev)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    models = ([m.strip() for m in a.models.split(",") if m.strip()]
+              if a.models else [m for m in MODELS if m in cfg["models"]])
     report = {"schema": "qt-fe-v2-model-interface-v1", "device": str(dev),
               "samples": train_ids, "models": {}}
-    for name in MODELS:
+    for name in models:
         torch.manual_seed(20261125)
-        mcfg = schema.model_cfg_with_dims(name, cfg["models"][name])
+        mcfg = schema.task_model_cfg(name, cfg, "topology1", 20261125)
         model = registry.build_gradient_model(name, mcfg).to(dev)
         opt = torch.optim.Adam([p for p in model.parameters() if p.requires_grad], lr=1e-3)
         model.train(); opt.zero_grad()

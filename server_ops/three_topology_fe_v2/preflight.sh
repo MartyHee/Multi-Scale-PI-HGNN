@@ -120,7 +120,8 @@ while IFS=$'\t' read -r worker run topology model seed device kind epochs maxb r
   [ -f "$RUNDIR/summary.json" ] || STATUS=1
   [ -f "$RUNDIR/slice_metrics.json" ] || STATUS=1
   for s in design_val load_val joint_val; do
-    [ -f "$RUNDIR/val_predictions_$s.json" ] || STATUS=1
+    if [ ! -f "$RUNDIR/val_predictions_$s.json" ] && \
+       [ ! -f "$RUNDIR/val_predictions_$s.npz" ]; then STATUS=1; fi
   done
   if [ -f "$RUNDIR/summary.json" ]; then
     "$PYTHON" - "$RUNDIR/summary.json" <<'PY' || STATUS=1

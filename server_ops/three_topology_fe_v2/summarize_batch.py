@@ -22,13 +22,20 @@ MODEL_ROOT = HERE.parents[1]
 
 GRAD_REQUIRED = ["STATUS.json", "TASK.json", "console.log", "run_log.json",
                  "summary.json", "train_log.csv", "slice_metrics.json",
-                 "val_predictions.json", "val_predictions_design_val.json",
-                 "val_predictions_load_val.json", "val_predictions_joint_val.json",
                  "checkpoints/best.pt", "checkpoints/last.pt"]
 ML_REQUIRED = ["STATUS.json", "TASK.json", "console.log", "summary.json",
-               "slice_metrics.json", "val_predictions.json",
-               "val_predictions_design_val.json", "val_predictions_load_val.json",
-               "val_predictions_joint_val.json", "ml_fit.json"]
+               "slice_metrics.json", "ml_fit.json"]
+SLICE_NAMES = ("design_val", "load_val", "joint_val")
+
+
+def missing_required(d: Path, kind: str) -> list:
+    """Required files; per-slice predictions accept legacy JSON or new NPZ."""
+    req = list(GRAD_REQUIRED if kind == "gradient" else ML_REQUIRED)
+    missing = [f for f in req if not (d / f).is_file()]
+    for s in SLICE_NAMES:
+        if not any((d / f"val_predictions_{s}.{ext}").is_file() for ext in ("json", "npz")):
+            missing.append(f"val_predictions_{s}.json|npz")
+    return missing
 
 
 def native(s):
@@ -89,10 +96,10 @@ def read_json(p: Path):
 
 def inspect_task(t: dict, d: Path, batch: str):
     kind = t["kind"]
-    req = list(GRAD_REQUIRED if kind == "gradient" else ML_REQUIRED)
-    if kind == "ml":
+    req = missing_required(d, kind)
+    if kind == "ml" and not (d / f"ml_{t['run']}.pkl").is_file():
         req.append(f"ml_{t['run']}.pkl")
-    row = {"state": None, "missing": [], "identity_ok": None,
+    row = {"state": None, "missing": req, "identity_ok": None,
            "selection_metric": None, "stop_reason": None,
            "run_dir": str(d), "attempt": None}
     if not d.is_dir():
@@ -103,7 +110,6 @@ def inspect_task(t: dict, d: Path, batch: str):
         row["attempt"] = int(m.group(1))
     st = read_json(d / "STATUS.json") if (d / "STATUS.json").is_file() else {}
     row["state"] = st.get("state", "NO_STATUS")
-    row["missing"] = [f for f in req if not (d / f).is_file()]
     task = read_json(d / "TASK.json") if (d / "TASK.json").is_file() else {}
     id_ok = (st.get("batch_id") == batch and st.get("topology") == t["topology"]
              and st.get("worker") == t["worker"] and st.get("model") == t["model"]

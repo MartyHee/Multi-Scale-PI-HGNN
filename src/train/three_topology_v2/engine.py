@@ -463,8 +463,12 @@ def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, A
              if val_evaluator is None else
              val_evaluator(model, val_bs, device, collect_predictions=True))
     t_inf1 = time.time()
-    (out_dir / "val_predictions.json").write_text(
-        json.dumps(final["exported"], ensure_ascii=False), encoding="utf-8")
+    # Legacy JSON runs keep the combined file.  New NPZ runs write only the
+    # three per-slice NPZ+meta files (the combined file duplicated them).
+    pred_fmt = str(cfg.get("training", {}).get("predictions_format", "json"))
+    if pred_fmt == "json":
+        (out_dir / "val_predictions.json").write_text(
+            json.dumps(final["exported"], ensure_ascii=False), encoding="utf-8")
     best_sha = hashlib.sha256(best_path.read_bytes()).hexdigest()
 
     if early_stopped:
@@ -503,7 +507,8 @@ def train_fold(model_name: str, model, train_ds, val_ds, stats, cfg: Dict[str, A
         "validation_ran": bool(final["n_batches"] > 0),
         "best_checkpoint_exported_from": best_path.name,
         "final_eval_from_best": bool(log["final_eval_checkpoint_sha256"] == best_sha),
-        "prediction_exported": bool((out_dir / "val_predictions.json").is_file()),
+        "prediction_exported": (bool((out_dir / "val_predictions.json").is_file())
+                                if pred_fmt == "json" else bool(final.get("exported"))),
     }
     log["pass"]["all"] = all(v is True for k, v in log["pass"].items() if k != "best_checkpoint_exported_from")
     (out_dir / "run_log.json").write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -17,10 +17,13 @@ class SliceBundle:
 
 class MultiSliceEvaluator:
     def __init__(self, slices: List[Tuple[str, Any]], stats: Dict[str, Any],
-                 max_batches: int | None = None):
+                 max_batches: int | None = None, predictions_format: str = "json"):
+        if predictions_format not in ("json", "npz"):
+            raise ValueError(f"unknown predictions_format {predictions_format!r}")
         self.slices = slices
         self.stats = stats
         self.max_batches = max_batches
+        self.predictions_format = predictions_format
         self.last = None
         self.last_per_slice: Dict[str, Dict[str, Any]] = {}
 
@@ -65,9 +68,18 @@ class MultiSliceEvaluator:
         out.mkdir(parents=True, exist_ok=True)
         records = {}
         for name, r in self.last_per_slice.items():
-            pred_path = out / f"val_predictions_{name}.json"
-            pred_path.write_text(json.dumps(r.get("exported", []), ensure_ascii=False),
-                                 encoding="utf-8")
+            exported = r.get("exported", [])
+            if self.predictions_format == "npz":
+                from .predictions import write_predictions_npz
+                pred_path = out / f"val_predictions_{name}.npz"
+                meta = write_predictions_npz(pred_path, exported,
+                                             checkpoint_source=run_label, slice_name=name)
+                n_pred = meta["n_samples"]
+            else:
+                pred_path = out / f"val_predictions_{name}.json"
+                pred_path.write_text(json.dumps(exported, ensure_ascii=False),
+                                     encoding="utf-8")
+                n_pred = len(exported)
             records[name] = {
                 "checkpoint_source": run_label,
                 "n_batches": r["n_batches"],
@@ -75,7 +87,8 @@ class MultiSliceEvaluator:
                 "entity_weighted_norm_mse": r["entity_weighted_norm_mse"],
                 "metrics": r["metrics"],
                 "predictions_file": pred_path.name,
-                "n_predictions": len(r.get("exported", [])),
+                "predictions_format": self.predictions_format,
+                "n_predictions": n_pred,
             }
         agg = {
             "checkpoint_source": run_label,

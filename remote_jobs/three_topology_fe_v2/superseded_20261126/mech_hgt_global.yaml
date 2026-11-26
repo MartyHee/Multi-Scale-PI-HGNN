@@ -1,0 +1,23 @@
+# Prepared 2026-11-26; NOT started by cc. Six-GPU cap: one job per terminal.
+# CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_fe_v2/run_job.sh mech_hgt_global.yaml
+job_name: mech_hgt_global
+batch_id: fv2_mech_20261126_01
+mode: formal
+train_config: configs/three_topology_fe_v2/strong_baselines.yaml
+description: mechanism control hgt_global; plain HGT is the gnn_hgt job in fv2_gnn_20261126_01 (same config/init seed)
+tasks:
+  - topology: topology1
+    model: hgt_global
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: mech_hgt_global
+  - topology: topology2
+    model: hgt_global
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: mech_hgt_global
+  - topology: topology3
+    model: hgt_global
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: mech_hgt_global

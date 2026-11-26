@@ -1,0 +1,23 @@
+# Prepared 2026-11-26; NOT started by cc. Six-GPU cap: one job per terminal.
+# CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_fe_v2/run_job.sh gnn_gin.yaml
+job_name: gnn_gin
+batch_id: fv2_gnn_20261126_01
+mode: formal
+train_config: configs/three_topology_fe_v2/strong_baselines.yaml
+description: gin x 3 topologies x 3 seeds (GNN baseline wave)
+tasks:
+  - topology: topology1
+    model: gin
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: gnn_gin
+  - topology: topology2
+    model: gin
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: gnn_gin
+  - topology: topology3
+    model: gin
+    seeds: [20261117, 20261118, 20261119]
+    device: gpu
+    worker: gnn_gin

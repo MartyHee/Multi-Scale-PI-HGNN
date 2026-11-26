@@ -1,0 +1,285 @@
+{
+  "schema": "qt-fe-v2-batch-manifest-v1",
+  "batch_id": "fv2_strong9_20261126_01",
+  "train_config": "configs/three_topology_fe_v2/strong_explore.yaml",
+  "train_config_sha256": "a13dcc759df9199f9176140159510f80b71310a85b309b982c9ceddce09ba701",
+  "training_effective": {
+    "epochs": 200,
+    "batch_size": 4,
+    "val_batch_size": 4,
+    "lr": 0.001,
+    "weight_decay": 0.0,
+    "early_stopping_patience": 15,
+    "min_delta": 0.0,
+    "grad_clip": 5.0,
+    "max_train_batches_per_epoch": null,
+    "selection_metric": "three_slice_graph_equal_task_equal_component_equal_normalized_mse",
+    "physics_loss_weight": 0.0
+  },
+  "allow_truncation": false,
+  "formal_training_authorized": false,
+  "input_identity": {
+    "samples_jsonl_sha256": "966d04722ed6e760b1e842b45f5cbddb490c2cad1d006da7b0ea86089e410d39",
+    "dataset_manifest_sha256": "0612fa1847d11d190d99d638f7c44bb2d4ecdc554c4c3074fc162b208b3851a8",
+    "feature_schema_sha256": "97dd2c589b046bd1c7e148bcd38fcf923f0be5d2c68c0d04887f82a90787cda3",
+    "protocol_sha256": "67402e6f87349292ba35bfcdac601900cca3a82351bf292a36d67385d7e012de",
+    "role_ledger_sha256": "a2dc677137b26bcf6a07b9bbb26e27a6605cd40f868d3cc72d07307a4e1a2331",
+    "split_manifest_sha256": "6bc8a2ffed05b0100061afb7275eba0963879b17093b0b5485dd85a029106407",
+    "stats_sha256": {
+      "topology1": "7222cf2783b16e48b3c7ec62f0ebf7db2f7d8b5ab975f62903a38c50a8f60087",
+      "topology2": "089cb444aca53968871baad4facd139b8bc4ce97f983479c295d38a170996161",
+      "topology3": "26972a089622458d6dd55ce7e5d0c4bb3a6a9faa0881251cc3b7c47a329404f0"
+    },
+    "read_path": "shared_v1",
+    "design_cache_sha256": {
+      "topology1": "164375f07bf02a0eb50be59704926f3e3a17cf22c10e75c897c41bced24a8359",
+      "topology2": "8aef61998776204017f5433a64a7ea5ed083549b0df6fa20c79be78b94deb605",
+      "topology3": "89db449c26921d2d3449209546373a53683057acbc6b0e0a021b0ee64f4a0f97"
+    },
+    "design_cache_meta_sha256": {
+      "topology1": "984689ff5d6419ed192d873a055abff9d6d892434cf6e728403c6a19f255a2c7",
+      "topology2": "c5e8931cffa8042ecca6df02fe5f4005baa6b6e2cc1113e4521af0290c9adaa0",
+      "topology3": "cdcb20d256844a71d659ce77e4e307cd098cfe7303ce68ee220cd0b712bb8573"
+    },
+    "shared_geometry_sha256": {
+      "topology1": "41a2c616537479945c2fab7d0898d5f317647fc2ed697f93ec07a221a49af5b6",
+      "topology2": "ee384927427e001161b6a085a27dc67e3a7b7b300ec2b5a09168391399028813",
+      "topology3": "8b612b41c29e99daadf21d27155f0d18152c1b14128345a73ef1587e89c11fda"
+    },
+    "field_loads_sha256": {
+      "topology1": "ffdb144fc1b3cfacb281e56edf0101427791c945d220cf64d3fd98c77e772f8a",
+      "topology2": "b5fe83ce5d6629bc475f5ce2ce0a6c010638c9da754589bc5086afaa36806b8f",
+      "topology3": "9dd7ad8c5dfecaa6d72a1f36170b20363c13de2c794410af49956dc82d67d382"
+    },
+    "role_counts": {
+      "topology1": {
+        "A": {
+          "train": 1360,
+          "val": 280,
+          "test": 280,
+          "blocked": 1152
+        },
+        "B": {
+          "train": 1360,
+          "val": 340,
+          "test": 476,
+          "blocked": 896
+        },
+        "C": {
+          "train": 1360,
+          "val": 70,
+          "test": 98,
+          "blocked": 1544
+        }
+      },
+      "topology2": {
+        "A": {
+          "train": 1360,
+          "val": 280,
+          "test": 280,
+          "blocked": 1152
+        },
+        "B": {
+          "train": 1360,
+          "val": 340,
+          "test": 476,
+          "blocked": 896
+        },
+        "C": {
+          "train": 1360,
+          "val": 70,
+          "test": 98,
+          "blocked": 1544
+        }
+      },
+      "topology3": {
+        "A": {
+          "train": 1360,
+          "val": 280,
+          "test": 280,
+          "blocked": 1152
+        },
+        "B": {
+          "train": 1360,
+          "val": 340,
+          "test": 476,
+          "blocked": 896
+        },
+        "C": {
+          "train": 1360,
+          "val": 70,
+          "test": 98,
+          "blocked": 1544
+        }
+      }
+    },
+    "input_dims": {
+      "mesh_node": 15,
+      "beam_element": 18,
+      "plate_element": 9,
+      "mlp_force_input": 33,
+      "ml_table_beam_input": 33
+    }
+  },
+  "code_sha256": "d22077ce8ef07960a40fb488cbbb209be65e187e4d85f87a216fd6a9cb74964e",
+  "git_commit": "55b42df3e55a2c95b21bae3e6c3cb06b5bedd3a5",
+  "source_jobs": [
+    "remote_jobs/three_topology_fe_v2/s9_lno_1.yaml",
+    "remote_jobs/three_topology_fe_v2/s9_lno_2.yaml",
+    "remote_jobs/three_topology_fe_v2/s9_lno_3.yaml",
+    "remote_jobs/three_topology_fe_v2/s9_mgn_1.yaml",
+    "remote_jobs/three_topology_fe_v2/s9_mgn_2.yaml",
+    "remote_jobs/three_topology_fe_v2/s9_mgn_3.yaml",
+    "remote_jobs/three_topology_fe_v2/s9_tplus_1.yaml",
+    "remote_jobs/three_topology_fe_v2/s9_tplus_2.yaml",
+    "remote_jobs/three_topology_fe_v2/s9_tplus_3.yaml"
+  ],
+  "n_tasks": 9,
+  "tasks": [
+    {
+      "worker": "s9_mgn_1",
+      "topology": "topology1",
+      "run": "meshgraphnet_explore_seed20261117",
+      "model": "meshgraphnet_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_mgn_1",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_mgn_1.yaml",
+      "job_file_sha256": "3351b87985d3390f8f432eac92ab23fc078690e0b99e63ccd861d215748eebb2",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "e0d9caa9618963ec46952ad8bbbb22ef272da23758c7e88ae46375c05c68f766"
+    },
+    {
+      "worker": "s9_tplus_1",
+      "topology": "topology1",
+      "run": "transolver_plus_explore_seed20261117",
+      "model": "transolver_plus_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_tplus_1",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_tplus_1.yaml",
+      "job_file_sha256": "c32f8bdd633fc623dcd4d39ed3cf1e971328ac2c31a949f319a7ec5948d18087",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "3fcd70b5fd27d0a55f945c15e45fc5b7aaa880037b9c03a8474ca6a5482ba7f3"
+    },
+    {
+      "worker": "s9_lno_1",
+      "topology": "topology1",
+      "run": "linearno_explore_seed20261117",
+      "model": "linearno_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_lno_1",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_lno_1.yaml",
+      "job_file_sha256": "4fee99c8d5edcd276581061347c400f1d65bbda1dfbc08ca25150f85076add91",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "acac81584919ec0873bce86aa4a62d0c02f175d3fd8684afaf02b426d87da2d6"
+    },
+    {
+      "worker": "s9_mgn_2",
+      "topology": "topology2",
+      "run": "meshgraphnet_explore_seed20261117",
+      "model": "meshgraphnet_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_mgn_2",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_mgn_2.yaml",
+      "job_file_sha256": "4ebd014f87394d4895ac647d1a7f66326cbbd1b343aed89888bd26e0a1256605",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "e0d9caa9618963ec46952ad8bbbb22ef272da23758c7e88ae46375c05c68f766"
+    },
+    {
+      "worker": "s9_tplus_2",
+      "topology": "topology2",
+      "run": "transolver_plus_explore_seed20261117",
+      "model": "transolver_plus_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_tplus_2",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_tplus_2.yaml",
+      "job_file_sha256": "737375de71bd29a87446e66641d647780081f4281f99ade10ad1910e359fea6a",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "3fcd70b5fd27d0a55f945c15e45fc5b7aaa880037b9c03a8474ca6a5482ba7f3"
+    },
+    {
+      "worker": "s9_lno_2",
+      "topology": "topology2",
+      "run": "linearno_explore_seed20261117",
+      "model": "linearno_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_lno_2",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_lno_2.yaml",
+      "job_file_sha256": "849c3c0eacde561cf7b6b8c0dde79df4a2b832a35d7c9ad71e3154ddc4e5bb41",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "acac81584919ec0873bce86aa4a62d0c02f175d3fd8684afaf02b426d87da2d6"
+    },
+    {
+      "worker": "s9_mgn_3",
+      "topology": "topology3",
+      "run": "meshgraphnet_explore_seed20261117",
+      "model": "meshgraphnet_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_mgn_3",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_mgn_3.yaml",
+      "job_file_sha256": "a8d3ee49a83e7e3a9c2a6b7716e172130b8d7bf4525e372085c0915fddb1688f",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "e0d9caa9618963ec46952ad8bbbb22ef272da23758c7e88ae46375c05c68f766"
+    },
+    {
+      "worker": "s9_tplus_3",
+      "topology": "topology3",
+      "run": "transolver_plus_explore_seed20261117",
+      "model": "transolver_plus_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_tplus_3",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_tplus_3.yaml",
+      "job_file_sha256": "a86ac9d0f5ef8b7b74abd4a47cf315edf4f47b10dcfc6b74f430063e95c5b954",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "3fcd70b5fd27d0a55f945c15e45fc5b7aaa880037b9c03a8474ca6a5482ba7f3"
+    },
+    {
+      "worker": "s9_lno_3",
+      "topology": "topology3",
+      "run": "linearno_explore_seed20261117",
+      "model": "linearno_explore",
+      "seed": "20261117",
+      "device": "gpu",
+      "kind": "gradient",
+      "job_name": "s9_lno_3",
+      "job_file": "remote_jobs/three_topology_fe_v2/s9_lno_3.yaml",
+      "job_file_sha256": "6708b5aaac66126c54b5fd00f4dd7833bb75981d30dcbbe61c9e637890cf1078",
+      "epochs": 200,
+      "max_batches": null,
+      "resume_from": null,
+      "model_config_sha256": "acac81584919ec0873bce86aa4a62d0c02f175d3fd8684afaf02b426d87da2d6"
+    }
+  ],
+  "created_at": "2026-11-26T10:54:52Z"
+}

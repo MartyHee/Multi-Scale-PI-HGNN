@@ -1,0 +1,13 @@
+# Prepared 2026-11-26 exploration; NOT started by cc.
+# CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_fe_v2/run_job.sh s9_mgn_1.yaml
+job_name: s9_mgn_1
+batch_id: fv2_strong9_20261126_01
+mode: formal
+train_config: configs/three_topology_fe_v2/strong_explore.yaml
+description: "meshgraphnet_explore topology1 fixed seed 20261117"
+tasks:
+  - topology: topology1
+    model: meshgraphnet_explore
+    seeds: [20261117]
+    device: gpu
+    worker: s9_mgn_1
