@@ -1,0 +1,13 @@
+# Prepared 2026-11-28; seed 20261118/19 only (seed17 already in fv2_strong9). NOT started by cc.
+# CUDA_VISIBLE_DEVICES=<gpu> bash server_ops/three_topology_fe_v2/run_job.sh s12_tplus_2.yaml
+job_name: s12_tplus_2
+batch_id: fv2_strong12_20261128_01
+mode: formal
+train_config: configs/three_topology_fe_v2/strong_explore.yaml
+description: "transolver_plus_explore topology2 seeds 20261118/19"
+tasks:
+  - topology: topology2
+    model: transolver_plus_explore
+    seeds: [20261118, 20261119]
+    device: gpu
+    worker: s12_tplus_2
